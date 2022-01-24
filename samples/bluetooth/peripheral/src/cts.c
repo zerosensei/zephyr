@@ -65,6 +65,95 @@ BT_GATT_SERVICE_DEFINE(cts_cvs,
 	BT_GATT_CCC(ct_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 );
 
+const struct bt_gatt_attr attr_cts_cvs[] = 
+{ 
+	{ 
+		.uuid = ((struct bt_uuid *) ((struct bt_uuid_16[]) 
+		{
+			{
+				 .uuid = { BT_UUID_TYPE_16 }, 
+				 .val = (0x2800), 
+			}
+		})), 
+		.read = bt_gatt_attr_read_service, 
+		.write = NULL, 
+		.user_data = ((struct bt_uuid *) ((struct bt_uuid_16[]) 
+		{
+			{
+				.uuid = { BT_UUID_TYPE_16 }, 
+				.val = (0x1805), 
+			}
+		})), 
+		.handle = 0, 
+		.perm = BT_GATT_PERM_READ, 
+	},
+
+	{ 
+		.uuid = ((struct bt_uuid *) ((struct bt_uuid_16[]) 
+		{
+			{
+				 .uuid = { BT_UUID_TYPE_16 }, 
+				 .val = (0x2803), 
+			}
+		})), 
+		.read = bt_gatt_attr_read_chrc, 
+		.write = NULL, 
+		.user_data = ((struct bt_gatt_chrc[]) 
+		{ 
+			{ .uuid = ((struct bt_uuid *) ((struct bt_uuid_16[]) 
+				{
+					{ 
+						.uuid = { BT_UUID_TYPE_16 }, 
+						.val = (0x2a2b), 
+					}
+				})), 
+			.value_handle = 0U, 
+			.properties = 0x02 | 0x10 | 0x08, 
+			}, 
+		}), 
+		.handle = 0, 
+		.perm = BT_GATT_PERM_READ, 
+	}, 
+
+	{ 
+		.uuid = ((struct bt_uuid *) ((struct bt_uuid_16[]) 
+		{
+			{
+				 .uuid = { BT_UUID_TYPE_16 }, 
+				 .val = (0x2a2b), 
+			}
+		})), 
+		.read = read_ct, 
+		.write = write_ct, 
+		.user_data = ct, 
+		.handle = 0, 
+		.perm = BT_GATT_PERM_READ | BT_GATT_PERM_WRITE, 
+	},  
+
+	{ 
+		.uuid = ((struct bt_uuid *) ((struct bt_uuid_16[]) 
+		{
+			{ 
+				.uuid = { BT_UUID_TYPE_16 }, 
+				.val = (0x2902), 
+			}
+		})), 
+		.read = bt_gatt_attr_read_ccc, 
+		.write = bt_gatt_attr_write_ccc, 
+		.user_data = ((struct _bt_gatt_ccc[]) 
+		{
+			{ 
+				.cfg = {}, 
+				.cfg_changed = ct_ccc_cfg_changed, 
+				.cfg_write = NULL, 
+				.cfg_match = NULL, 
+			}
+		}), 
+		.handle = 0, 
+		.perm = BT_GATT_PERM_READ | BT_GATT_PERM_WRITE, 
+	},
+};
+
 static void generate_current_time(uint8_t *buf)
 {
 	uint16_t year;
