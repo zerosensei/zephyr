@@ -1,0 +1,30 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH CH32 family ADC
+
+compatible: "wch,ch32-adc"
+
+include: [adc-controller.yaml, pinctrl-device.yaml]
+
+properties:
+    reg:
+      required: true
+
+    clocks:
+      required: true
+
+    interrupts:
+      required: true
+
+    "#io-channel-cells":
+      const: 1
+
+    pinctrl-0:
+      required: true
+
+    pinctrl-names:
+      required: true
+
+io-channel-cells:
+    - input

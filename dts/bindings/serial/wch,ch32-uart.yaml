@@ -1,0 +1,5 @@
+description: CH32 UART
+
+compatible: "wch,ch32-uart"
+
+include: wch,ch32-uart-common.yaml

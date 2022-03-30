@@ -1,0 +1,15 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH family RNG (Random Number Generator)
+
+compatible: "wch,whc-rng"
+
+include: base.yaml
+
+properties:
+    reg:
+      required: true
+
+    interrupts:
+      required: true

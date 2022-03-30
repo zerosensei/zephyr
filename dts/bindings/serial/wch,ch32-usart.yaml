@@ -1,0 +1,5 @@
+description: CH32 USART
+
+compatible: "wch,ch32-usart"
+
+include: wch,ch32-uart-common.yaml

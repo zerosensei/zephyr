@@ -1,0 +1,8 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH Family flash controller
+
+compatible: "wch,wch-flash-controller"
+
+include: flash-controller.yaml

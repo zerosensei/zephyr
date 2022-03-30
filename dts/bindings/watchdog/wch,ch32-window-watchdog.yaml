@@ -1,0 +1,15 @@
+description: CH32 system window watchdog
+
+compatible: "wch,ch32-window-watchdog"
+
+include: base.yaml
+
+properties:
+    reg:
+      required: true
+
+    label:
+      required: true
+
+    clocks:
+      required: true
