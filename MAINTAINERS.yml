@@ -136,6 +136,7 @@ ARM arch:
         - MaureenHelm
         - stephanosio
         - bbolen
+        - povergoing
     files:
         - arch/arm/
         - arch/arm/core/offsets/
@@ -183,13 +184,18 @@ Bluetooth:
         - subsys/bluetooth/host/
         - subsys/bluetooth/services/
         - subsys/bluetooth/shell/
-        - subsys/bluetooth/audio/
         - tests/bluetooth/
     files-exclude:
         - include/bluetooth/mesh/
         - subsys/bluetooth/controller/
         - subsys/bluetooth/mesh/
         - samples/bluetooth/mesh/
+        - subsys/bluetooth/audio/
+        - include/bluetooth/audio/
+        - tests/bluetooth/bsim_bt/bsim_test_audio/
+        - tests/bluetooth/controller/
+        - tests/bluetooth/mesh_*/
+        - tests/bluetooth/mesh/
     labels:
         - "area: Bluetooth"
 
@@ -204,8 +210,10 @@ Bluetooth controller:
         - ppryga
         - mtpr-ot
         - wopu-ot
+        - erbr-ot
     files:
         - subsys/bluetooth/controller/
+        - tests/bluetooth/controller/
     labels:
         - "area: Bluetooth Controller"
         - "area: Bluetooth"
@@ -213,18 +221,36 @@ Bluetooth controller:
 Bluetooth Mesh:
     status: maintained
     maintainers:
-        - trond-snekvik
+        - PavelVPV
     collaborators:
         - jhedberg
         - LingaoM
         - alxelax
-        - PavelVPV
     files:
         - subsys/bluetooth/mesh/
         - include/bluetooth/mesh/
         - tests/bluetooth/mesh*/
     labels:
         - "area: Bluetooth Mesh"
+        - "area: Bluetooth"
+
+Bluetooth Audio:
+    status: maintained
+    maintainers:
+        - Thalley
+        - asbjornsabo
+    collaborators:
+        - Vudentz
+        - jhedberg
+        - Casper-Bonde-Bose
+        - MariuszSkamra
+        - rymanluk
+    files:
+        - subsys/bluetooth/audio/
+        - include/bluetooth/audio/
+        - tests/bluetooth/bsim_bt/bsim_test_audio/
+    labels:
+        - "area: Bluetooth Audio"
         - "area: Bluetooth"
 
 Build system:
@@ -234,7 +260,6 @@ Build system:
     collaborators:
         - jeremybettis
         - nashif
-        - SebastianBoe
     files:
         - cmake/
         - CMakeLists.txt
@@ -381,6 +406,8 @@ Disk:
     status: maintained
     maintainers:
         - jfischer-no
+    collaborators:
+        - danieldegrasse
     files:
         - include/storage/disk_access.h
         - include/drivers/disk.h
@@ -458,27 +485,30 @@ Documentation:
 "Drivers: CAN":
     status: maintained
     maintainers:
-        - alexanderwachter
-    collaborators:
         - henrikbrixandersen
+    collaborators:
+        - alexanderwachter
         - karstenkoenig
         - nixward
         - martinjaeger
         - legoabram
     files:
+        - doc/reference/canbus/
         - drivers/can/
+        - dts/bindings/can/
         - include/canbus/
+        - include/devicetree/can.h
+        - include/drivers/can.h
+        - include/drivers/can/
+        - modules/canopennode/
+        - samples/drivers/can/
+        - samples/modules/canopennode/
+        - samples/net/sockets/can/
+        - samples/subsys/canbus/
         - subsys/canbus/
         - subsys/net/l2/canbus/
-        - tests/subsys/canbus/
-        - dts/bindings/can/
-        - include/drivers/can.h
-        - samples/drivers/can/
         - tests/drivers/can/
-        - samples/subsys/canbus/
-        - doc/reference/canbus/
-        - modules/canopennode/
-        - samples/modules/canopennode/
+        - tests/subsys/canbus/
     labels:
         - "area: CAN"
 
@@ -518,7 +548,9 @@ Documentation:
         - "area: Counter"
 
 "Drivers: Crypto":
-    status: orphaned
+    status: maintained
+    maintainers:
+        - ceolin
     files:
         - drivers/crypto/
         - dts/bindings/crypto/
@@ -667,6 +699,7 @@ Documentation:
         - tbursztyka
     collaborators:
         - rlubos
+        - jciupis
     files:
         - drivers/ieee802154/
     labels:
@@ -737,6 +770,7 @@ Documentation:
         - Mani-Sadhasivam
     collaborators:
         - mniestroj
+        - JordanYates
     files:
         - drivers/lora/
         - include/drivers/lora.h
@@ -974,6 +1008,19 @@ Filesystems:
     labels:
         - "area: File System"
 
+Formatted Output:
+    status: maintained
+    maintainers:
+      - nordic-krch
+    files:
+      - include/sys/cbprintf*
+      - tests/unit/cbprintf/
+      - tests/lib/cbprintf_*/
+      - lib/os/cbprintf*
+      - lib/os/Kconfig.cbprintf
+    labels:
+      - "area: Formatting Output"
+
 IPC:
     status: maintained
     maintainers:
@@ -1042,6 +1089,12 @@ Base OS:
     files:
         - include/sys/
         - lib/os/
+    files-exclude:
+      - include/sys/cbprintf*
+      - tests/unit/cbprintf/
+      - tests/lib/cbprintf_*/
+      - lib/os/cbprintf*
+      - lib/os/Kconfig.cbprintf
     labels:
         - "area: Base OS"
 
@@ -1287,6 +1340,7 @@ POSIX API layer:
         - pfalcon
         - enjiamai
         - KangJianX
+        - cfriedt
     files:
         - include/posix/
         - lib/posix/
@@ -1304,7 +1358,7 @@ Power management:
         - gmarull
         - teburd
     files:
-        - include/pm/pm.h
+        - include/pm/
         - samples/subsys/pm/
         - subsys/pm/
         - tests/subsys/pm/
@@ -1321,7 +1375,7 @@ RISCV arch:
         - fkokosinski
         - mgielda
         - katsuster
-        - henrikbrixandersen
+        - edersondisouza
     files:
         - arch/riscv/
         - boards/riscv/
@@ -1508,6 +1562,7 @@ Intel Platforms (X86):
         - jhedberg
         - aasthagr
         - laurenmurphyx64
+        - MaureenHelm
     files:
         - boards/x86/
         - soc/x86/
@@ -1526,6 +1581,7 @@ Intel Platforms (Xtensa):
         - mengxianglinx
         - marc-hb
         - kv2019i
+        - MaureenHelm
     files:
         - boards/xtensa/intel_*/
         - soc/xtensa/intel_*/
@@ -1581,6 +1637,24 @@ nRF Platforms:
         - dts/arm/nordic/
     labels:
         - "platform: nRF"
+
+Renesas R-Car Platforms:
+    status: maintained
+    maintainers:
+        - aaillet
+    collaborators:
+        - pmarzin
+    files:
+        - boards/arm/rcar_*/
+        - drivers/*/*rcar*
+        - dts/arm/renesas/
+        - dts/bindings/*/*rcar*
+        - soc/arm/renesas_rcar/
+    labels:
+        - "platform: Renesas R-Car"
+    description: >-
+        Renesas R-Car SOCs, dts files and related drivers. Renesas boards based
+        on R-Car SOCs.
 
 STM32 Platforms:
     status: maintained
@@ -1679,7 +1753,7 @@ TF-M Integration:
     maintainers:
         - microbuilder
     collaborators:
-        - SebastianBoe
+        - joerchan
     files:
         - samples/tfm_integration/
         - modules/trusted-firmware-m/
@@ -1810,6 +1884,7 @@ CI:
     maintainers:
         - nashif
         - galak
+        - stephanosio
     files:
         - .github/
         - scripts/ci/
@@ -1830,3 +1905,13 @@ ZTest:
         - tests/unit/util/
     labels:
         - "area: Testsuite"
+
+Random:
+    status: orphaned
+    collaborators:
+         - ceolin
+    files:
+        - subsys/random/
+        - include/random/
+    labels:
+        - "area: Random"

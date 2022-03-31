@@ -146,6 +146,24 @@ typedef void (*bt_ready_cb_t)(int err);
 int bt_enable(bt_ready_cb_t cb);
 
 /**
+ * @brief Disable Bluetooth
+ *
+ * Disable Bluetooth. Can't be called before bt_enable has completed.
+ *
+ * Close and release HCI resources. Result is architecture dependent.
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int bt_disable(void);
+
+/**
+ * @brief Check if Bluetooth is ready
+ *
+ * @return true when Bluetooth is ready, false otherwise
+ */
+bool bt_is_ready(void);
+
+/**
  * @brief Set Bluetooth Device Name
  *
  * Set Bluetooth GAP Device Name.
@@ -168,6 +186,34 @@ int bt_set_name(const char *name);
  * @return Bluetooth Device Name
  */
 const char *bt_get_name(void);
+
+/**
+ * @brief Get local Bluetooth appearance
+ *
+ * Bluetooth Appearance is a description of the external appearance of a device
+ * in terms of an Appearance Value.
+ *
+ * @see https://specificationrefs.bluetooth.com/assigned-values/Appearance%20Values.pdf
+ *
+ * @returns Appearance Value of local Bluetooth host.
+ */
+uint16_t bt_get_appearance(void);
+
+/**
+ * @brief Set local Bluetooth appearance
+ *
+ * Automatically preserves the new appearance across reboots if
+ * @kconfig{CONFIG_BT_SETTINGS} is enabled.
+ *
+ * This symbol is linkable if @kconfig{CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC} is
+ * enabled.
+ *
+ * @param new_appearance Appearance Value
+ *
+ * @retval 0 Success.
+ * @retval other Persistent storage failed. Appearance was not updated.
+ */
+int bt_set_appearance(uint16_t new_appearance);
 
 /**
  * @brief Get the currently configured identities.
@@ -1423,7 +1469,7 @@ int bt_le_per_adv_sync_delete(struct bt_le_per_adv_sync *per_adv_sync);
  * @brief Register periodic advertising sync callbacks.
  *
  * Adds the callback structure to the list of callback structures for periodic
- * adverising syncs.
+ * advertising syncs.
  *
  * This callback will be called for all periodic advertising sync activity,
  * such as synced, terminated and when data is received.

@@ -241,8 +241,8 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 #define MDM_SEND_OK_ENABLED 0
 #define MDM_SEND_OK_DISABLED 1
 
-#define MDM_CMD_SEND_TIMEOUT K_SECONDS(5)
-#define MDM_IP_SEND_RX_TIMEOUT K_SECONDS(60)
+#define MDM_CMD_SEND_TIMEOUT K_SECONDS(6)
+#define MDM_IP_SEND_RX_TIMEOUT K_SECONDS(62)
 #define MDM_SOCK_NOTIF_DELAY K_MSEC(150)
 #define MDM_CMD_CONN_TIMEOUT K_SECONDS(31)
 
@@ -283,6 +283,9 @@ static const struct mdm_control_pinconfig pinconfig[] = {
 #define MDM_TOP_BAND_START_POSITION 2
 #define MDM_MIDDLE_BAND_START_POSITION 6
 #define MDM_BOTTOM_BAND_START_POSITION 14
+#define MDM_BAND_BITMAP_STR_LENGTH_MAX                                                             \
+	(MDM_TOP_BAND_SIZE + MDM_MIDDLE_BAND_SIZE + MDM_BOTTOM_BAND_SIZE)
+#define MDM_BAND_BITMAP_STR_LENGTH_MIN 1
 
 #define MDM_DEFAULT_AT_CMD_RETRIES 3
 #define MDM_WAKEUP_TIME K_SECONDS(12)
@@ -384,7 +387,7 @@ static const char TIME_STRING_FORMAT[] = "\"yy/MM/dd,hh:mm:ss?zz\"";
 	} while (0)
 
 /* Complex has "no_id_resp" set to true because the sending command
- * is the command used to process the respone
+ * is the command used to process the response
  */
 #define SEND_COMPLEX_AT_CMD(c)                                                 \
 	do {                                                                   \
@@ -660,6 +663,7 @@ static struct stale_socket *dequeue_stale_socket(void)
 
 static bool convert_time_string_to_struct(struct tm *tm, int32_t *offset,
 					  char *time_string);
+static int modem_reset_and_configure(void);
 
 static int read_pin(int default_state, const struct device *port, gpio_pin_t pin)
 {
@@ -1432,7 +1436,7 @@ static int send_data(struct hl7800_socket *sock, struct net_pkt *pkt)
 	/* Send EOF pattern to terminate data */
 	k_sem_reset(&sock->sock_send_sem);
 	mdm_receiver_send(&ictx.mdm_ctx, EOF_PATTERN, strlen(EOF_PATTERN));
-	ret = k_sem_take(&sock->sock_send_sem, MDM_CMD_SEND_TIMEOUT);
+	ret = k_sem_take(&sock->sock_send_sem, MDM_IP_SEND_RX_TIMEOUT);
 	if (ret == 0) {
 		ret = ictx.last_error;
 	} else if (ret == -EAGAIN) {
@@ -3336,15 +3340,15 @@ done:
 
 static bool on_cmd_modem_functionality(struct net_buf **buf, uint16_t len)
 {
-	struct net_buf *frag = NULL;
+	struct net_buf *frag;
 	size_t out_len;
 	char rsp[MDM_HL7800_MODEM_FUNCTIONALITY_SIZE];
 
 	wait_for_modem_data_and_newline(buf, net_buf_frags_len(*buf),
 					MDM_HL7800_MODEM_FUNCTIONALITY_SIZE);
 
-	len = net_buf_findcrlf(*buf, &frag);
 	frag = NULL;
+	len = net_buf_findcrlf(*buf, &frag);
 	if (!frag) {
 		LOG_ERR("Unable to find end of response");
 		goto done;
@@ -4786,20 +4790,71 @@ void mdm_gpio6_callback_isr(const struct device *port, struct gpio_callback *cb,
 #endif
 }
 
-void mdm_uart_cts_callback(const struct device *port, struct gpio_callback *cb,
-			   uint32_t pins)
+/**
+ * @brief Short spikes in CTS can be removed in the signal used by the application
+ */
+static int glitch_filter(int default_state, const struct device *port, gpio_pin_t pin,
+			 uint32_t usec_to_wait, uint32_t max_iterations)
 {
-	ictx.cts_state = (uint32_t)gpio_pin_get(
-		ictx.gpio_port_dev[MDM_UART_CTS], pinconfig[MDM_UART_CTS].pin);
+	int i = 0;
+	int state1;
+	int state2;
+
+	do {
+		state1 = read_pin(-1, port, pin);
+		k_busy_wait(usec_to_wait);
+		state2 = read_pin(-1, port, pin);
+		i += 1;
+	} while (((state1 != state2) || (state1 < 0) || (state2 < 0)) && (i < max_iterations));
+
+	if (i >= max_iterations) {
+		LOG_WRN("glitch filter max iterations exceeded %d", i);
+		if (state1 < 0) {
+			if (state2 < 0) {
+				state1 = read_pin(default_state, port, pin);
+			} else {
+				state1 = state2;
+			}
+		}
+	}
+
+	return state1;
+}
+
+void mdm_uart_cts_callback(const struct device *port, struct gpio_callback *cb, uint32_t pins)
+{
+	ARG_UNUSED(port);
+	ARG_UNUSED(cb);
+	ARG_UNUSED(pins);
+
+	ictx.cts_state =
+		glitch_filter(0, ictx.gpio_port_dev[MDM_UART_CTS], pinconfig[MDM_UART_CTS].pin,
+			      CONFIG_MODEM_HL7800_CTS_FILTER_US,
+			      CONFIG_MODEM_HL7800_CTS_FILTER_MAX_ITERATIONS);
+
+	/* CTS toggles A LOT,
+	 * comment out the debug print unless we really need it.
+	 */
+	/* HL7800_IO_DBG_LOG("MDM_UART_CTS:%d", ictx.cts_state); */
 
 	if ((ictx.cts_callback != NULL) && (ictx.desired_sleep_level == HL7800_SLEEP_SLEEP)) {
 		ictx.cts_callback(ictx.cts_state);
 	}
 
-	/* CTS toggles A LOT,
-	 * comment out the debug print unless we really need it.
-	 */
-	/* LOG_DBG("MDM_UART_CTS:%d", val); */
+#ifdef CONFIG_MODEM_HL7800_LOW_POWER_MODE
+	if (ictx.desired_sleep_level == HL7800_SLEEP_SLEEP) {
+		if (ictx.cts_state) {
+			/* HL7800 is not awake, shut down UART to save power */
+			shutdown_uart();
+		} else {
+			power_on_uart();
+			if (ictx.sleep_state == HL7800_SLEEP_SLEEP) {
+				allow_sleep(false);
+			}
+		}
+	}
+#endif
+
 	check_hl7800_awake();
 }
 
@@ -4948,6 +5003,68 @@ static int setup_gprs_connection(char *access_point_name)
 	return send_at_cmd(NULL, cmd_string, MDM_CMD_SEND_TIMEOUT, 0, false);
 }
 
+static int set_bands(const char *bands, bool full_reboot)
+{
+	int ret;
+	char cmd[sizeof("AT+KBNDCFG=#,####################")];
+
+	snprintk(cmd, sizeof(cmd), "AT+KBNDCFG=%d,%s", ictx.mdm_rat, bands);
+	ret = send_at_cmd(NULL, cmd, MDM_CMD_SEND_TIMEOUT, MDM_DEFAULT_AT_CMD_RETRIES, false);
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (!full_reboot) {
+		ret = send_at_cmd(NULL, "AT+CFUN=1,1", MDM_CMD_SEND_TIMEOUT,
+				  MDM_DEFAULT_AT_CMD_RETRIES, false);
+		if (ret < 0) {
+			return ret;
+		}
+
+		ret = modem_boot_handler("LTE bands were just set");
+	} else {
+		ret = modem_reset_and_configure();
+	}
+	return ret;
+}
+
+int32_t mdm_hl7800_set_bands(const char *bands)
+{
+	int ret, i;
+	char temp_bands[MDM_BAND_BITMAP_STR_LENGTH_MAX + 1];
+	int num_leading_zeros;
+
+	if ((bands == NULL) || (strlen(bands) > MDM_BAND_BITMAP_STR_LENGTH_MAX) ||
+	    (strlen(bands) < MDM_BAND_BITMAP_STR_LENGTH_MIN)) {
+		return -EINVAL;
+	}
+
+	if (strlen(bands) < MDM_BAND_BITMAP_STR_LENGTH_MAX) {
+		num_leading_zeros = MDM_BAND_BITMAP_STR_LENGTH_MAX - strlen(bands);
+		for (i = 0; i < num_leading_zeros; i++) {
+			temp_bands[i] = '0';
+			if (i == (num_leading_zeros - 1)) {
+				strncpy(temp_bands + (i + 1), bands, sizeof(temp_bands) - (i + 1));
+			}
+		}
+	} else {
+		memcpy(temp_bands, bands, sizeof(temp_bands));
+	}
+
+	/* no need to set bands if settings match */
+	if (strncmp(temp_bands, ictx.mdm_bands_string, sizeof(temp_bands)) == 0) {
+		return 0;
+	}
+
+	hl7800_lock();
+
+	ret = set_bands(temp_bands, true);
+
+	hl7800_unlock();
+
+	return ret;
+}
+
 static int modem_reset_and_configure(void)
 {
 	int ret = 0;
@@ -4959,7 +5076,7 @@ static int modem_reset_and_configure(void)
 #if CONFIG_MODEM_HL7800_CONFIGURE_BANDS
 	uint16_t bands_top = 0;
 	uint32_t bands_middle = 0, bands_bottom = 0;
-	char new_bands[sizeof("AT+KBNDCFG=#,####################")];
+	char new_bands[MDM_BAND_BITMAP_STR_LENGTH_MAX + 1];
 #endif
 #if CONFIG_MODEM_HL7800_PSM
 	const char TURN_ON_PSM[] =
@@ -5132,13 +5249,11 @@ reboot:
 		}
 
 		snprintk(new_bands, sizeof(new_bands),
-			 "AT+KBNDCFG=%d,%04x%08x%08x", ictx.mdm_rat, bands_top,
-			 bands_middle, bands_bottom);
-		SEND_AT_CMD_EXPECT_OK(new_bands);
+			 "%0" STRINGIFY(MDM_TOP_BAND_SIZE) "x%0" STRINGIFY(
+				 MDM_MIDDLE_BAND_SIZE) "x%0" STRINGIFY(MDM_BOTTOM_BAND_SIZE) "x",
+			 bands_top, bands_middle, bands_bottom);
 
-		SEND_AT_CMD_EXPECT_OK("AT+CFUN=1,1");
-
-		modem_boot_handler("LTE bands were just set");
+		ret = set_bands(new_bands, false);
 		if (ret < 0) {
 			goto error;
 		}
@@ -5224,7 +5339,7 @@ reboot:
 	}
 
 	/* Query PDP authentication context to get APN username/password.
-	 * Temporary Workaroud - Ignore error
+	 * Temporary Workaround - Ignore error
 	 * On some modules this is returning an error and the response data.
 	 */
 	SEND_AT_CMD_IGNORE_ERROR("AT+WPPP?");
@@ -5384,7 +5499,7 @@ static int connect_TCP_socket(struct hl7800_socket *sock)
 		goto done;
 	}
 	/* Now wait for +KTCP_IND or +KTCP_NOTIF to ensure
-	 * the connection succeded or failed.
+	 * the connection succeeded or failed.
 	 */
 	ret = k_sem_take(&sock->sock_send_sem, MDM_CMD_CONN_TIMEOUT);
 	if (ret == 0) {

@@ -188,14 +188,12 @@ static const struct ec2i_t pmc2_settings[] = {
  * Eg. the I/O cycle 800h~8ffh from host can be mapped to x800h~x8ffh.
  * Linker script of h2ram.ld will make the pool 4K aligned.
  */
-#define IT8XXX2_ESPI_H2RAM_POOL_SIZE 0x1000
-static uint8_t h2ram_pool[IT8XXX2_ESPI_H2RAM_POOL_SIZE]
-					__attribute__((section(".h2ram_pool")));
+#define IT8XXX2_ESPI_H2RAM_POOL_SIZE_MAX 0x1000
 
 #if defined(CONFIG_ESPI_PERIPHERAL_ACPI_SHM_REGION)
 #define H2RAM_ACPI_SHM_MAX ((CONFIG_ESPI_IT8XXX2_ACPI_SHM_H2RAM_SIZE) + \
 			(CONFIG_ESPI_PERIPHERAL_ACPI_SHM_REGION_PORT_NUM))
-#if (H2RAM_ACPI_SHM_MAX > IT8XXX2_ESPI_H2RAM_POOL_SIZE)
+#if (H2RAM_ACPI_SHM_MAX > IT8XXX2_ESPI_H2RAM_POOL_SIZE_MAX)
 #error "ACPI shared memory region out of h2ram"
 #endif
 #endif /* CONFIG_ESPI_PERIPHERAL_ACPI_SHM_REGION */
@@ -203,7 +201,7 @@ static uint8_t h2ram_pool[IT8XXX2_ESPI_H2RAM_POOL_SIZE]
 #if defined(CONFIG_ESPI_PERIPHERAL_EC_HOST_CMD)
 #define H2RAM_EC_HOST_CMD_MAX ((CONFIG_ESPI_IT8XXX2_HC_H2RAM_SIZE) + \
 			(CONFIG_ESPI_PERIPHERAL_HOST_CMD_PARAM_PORT_NUM))
-#if (H2RAM_EC_HOST_CMD_MAX > IT8XXX2_ESPI_H2RAM_POOL_SIZE)
+#if (H2RAM_EC_HOST_CMD_MAX > IT8XXX2_ESPI_H2RAM_POOL_SIZE_MAX)
 #error "EC host command parameters out of h2ram"
 #endif
 #endif /* CONFIG_ESPI_PERIPHERAL_EC_HOST_CMD */
@@ -216,6 +214,9 @@ static uint8_t h2ram_pool[IT8XXX2_ESPI_H2RAM_POOL_SIZE]
 #error "ACPI and HC sections of h2ram overlap"
 #endif
 #endif
+
+static uint8_t h2ram_pool[MAX(H2RAM_ACPI_SHM_MAX, H2RAM_EC_HOST_CMD_MAX)]
+					__attribute__((section(".h2ram_pool")));
 
 #define H2RAM_WINDOW_SIZE(ram_size) ((find_msb_set((ram_size) / 16) - 1) & 0x7)
 
@@ -240,7 +241,7 @@ static void smfi_it8xxx2_init(const struct device *dev)
 
 	/* Set the host to RAM cycle address offset */
 	h2ram_offset = ((uint32_t)h2ram_pool & 0xffff) /
-				IT8XXX2_ESPI_H2RAM_POOL_SIZE;
+				IT8XXX2_ESPI_H2RAM_POOL_SIZE_MAX;
 	gctrl->GCTRL_H2ROFSR |= h2ram_offset;
 
 #ifdef CONFIG_ESPI_PERIPHERAL_EC_HOST_CMD
@@ -991,14 +992,12 @@ static int espi_it8xxx2_receive_oob(const struct device *dev,
 				struct espi_oob_packet *pckt)
 {
 	const struct espi_it8xxx2_config *const config = dev->config;
-	struct espi_it8xxx2_data *const data = dev->data;
 	struct espi_slave_regs *const slave_reg =
 		(struct espi_slave_regs *)config->base_espi_slave;
 	struct espi_queue0_regs *const queue0_reg =
 		(struct espi_queue0_regs *)config->base_espi_queue0;
 	struct espi_oob_msg_packet *oob_pckt =
 		(struct espi_oob_msg_packet *)pckt->buf;
-	int ret;
 	uint8_t oob_len;
 
 	if (!(slave_reg->CH_OOB_CAPCFG3 & IT8XXX2_ESPI_OOB_READY_MASK)) {
@@ -1006,12 +1005,17 @@ static int espi_it8xxx2_receive_oob(const struct device *dev,
 		return -EIO;
 	}
 
+#ifndef CONFIG_ESPI_OOB_CHANNEL_RX_ASYNC
+	struct espi_it8xxx2_data *const data = dev->data;
+	int ret;
+
 	/* Wait until receive OOB message or timeout */
 	ret = k_sem_take(&data->oob_upstream_go, K_MSEC(ESPI_OOB_TIMEOUT_MS));
 	if (ret == -EAGAIN) {
 		LOG_ERR("%s: Timeout", __func__);
 		return -ETIMEDOUT;
 	}
+#endif
 
 	/* Get length */
 	oob_len = (slave_reg->ESOCTRL4 & IT8XXX2_ESPI_PUT_OOB_LEN_MASK);
@@ -1040,11 +1044,14 @@ static int espi_it8xxx2_receive_oob(const struct device *dev,
 static void espi_it8xxx2_oob_init(const struct device *dev)
 {
 	const struct espi_it8xxx2_config *const config = dev->config;
-	struct espi_it8xxx2_data *const data = dev->data;
 	struct espi_slave_regs *const slave_reg =
 		(struct espi_slave_regs *)config->base_espi_slave;
 
+#ifndef CONFIG_ESPI_OOB_CHANNEL_RX_ASYNC
+	struct espi_it8xxx2_data *const data = dev->data;
+
 	k_sem_init(&data->oob_upstream_go, 0, 1);
+#endif
 
 	/* Upstream interrupt enable */
 	slave_reg->ESUCTRL0 |= IT8XXX2_ESPI_UPSTREAM_INTERRUPT_ENABLE;
@@ -1654,11 +1661,22 @@ static void espi_it8xxx2_put_oob_status_isr(const struct device *dev)
 	struct espi_it8xxx2_data *const data = dev->data;
 	struct espi_slave_regs *const slave_reg =
 		(struct espi_slave_regs *)config->base_espi_slave;
+#ifdef CONFIG_ESPI_OOB_CHANNEL_RX_ASYNC
+	struct espi_event evt = { .evt_type = ESPI_BUS_EVENT_OOB_RECEIVED,
+				  .evt_details = 0,
+				  .evt_data = 0 };
+#endif
 
 	/* Write-1 to clear this bit for the next coming posted transaction. */
 	slave_reg->ESOCTRL0 |= IT8XXX2_ESPI_PUT_OOB_STATUS;
 
+#ifndef CONFIG_ESPI_OOB_CHANNEL_RX_ASYNC
 	k_sem_give(&data->oob_upstream_go);
+#else
+	/* Additional detail is length field of PUT_OOB message packet. */
+	evt.evt_details = (slave_reg->ESOCTRL4 & IT8XXX2_ESPI_PUT_OOB_LEN_MASK);
+	espi_send_callbacks(&data->callbacks, dev, evt);
+#endif
 }
 #endif
 
@@ -1803,7 +1821,7 @@ static void espi_it8xxx2_enable_reset(void)
 	gpio_add_callback(ESPI_IT8XXX2_ESPI_RESET_PORT, &espi_reset_cb);
 	gpio_pin_interrupt_configure(ESPI_IT8XXX2_ESPI_RESET_PORT,
 					ESPI_IT8XXX2_ESPI_RESET_PIN,
-					GPIO_INT_TRIG_BOTH);
+					GPIO_INT_MODE_EDGE | GPIO_INT_TRIG_BOTH);
 }
 
 static struct espi_it8xxx2_data espi_it8xxx2_data_0;

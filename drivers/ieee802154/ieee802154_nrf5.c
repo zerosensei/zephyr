@@ -62,7 +62,7 @@ static struct nrf5_802154_data nrf5_data;
 #define DRX_SLOT_RX 1 /* Actual delayed reception window ID */
 #define PH_DURATION 10 /* Duration of the placeholder window, in microseconds */
 /* When scheduling the actual delayed reception window an adjustment of
- * 800 us is required to match the CSL tranmission timing for unknown
+ * 800 us is required to match the CSL transmission timing for unknown
  * reasons. This is a temporary workaround until the root cause is found.
  */
 #define DRX_ADJUST 800
@@ -449,6 +449,7 @@ static bool nrf5_tx_immediate(struct net_pkt *pkt, uint8_t *payload, bool cca)
 	return nrf_802154_transmit_raw(payload, &metadata);
 }
 
+#if NRF_802154_CSMA_CA_ENABLED
 static bool nrf5_tx_csma_ca(struct net_pkt *pkt, uint8_t *payload)
 {
 	nrf_802154_transmit_csma_ca_metadata_t metadata = {
@@ -460,6 +461,7 @@ static bool nrf5_tx_csma_ca(struct net_pkt *pkt, uint8_t *payload)
 
 	return nrf_802154_transmit_csma_ca_raw(payload, &metadata);
 }
+#endif
 
 #if IS_ENABLED(CONFIG_NET_PKT_TXTIME)
 static bool nrf5_tx_at(struct net_pkt *pkt, uint8_t *payload, bool cca)
@@ -509,9 +511,11 @@ static int nrf5_tx(const struct device *dev,
 		ret = nrf5_tx_immediate(pkt, nrf5_radio->tx_psdu,
 					mode == IEEE802154_TX_MODE_CCA);
 		break;
+#if NRF_802154_CSMA_CA_ENABLED
 	case IEEE802154_TX_MODE_CSMA_CA:
 		ret = nrf5_tx_csma_ca(pkt, nrf5_radio->tx_psdu);
 		break;
+#endif
 #if IS_ENABLED(CONFIG_NET_PKT_TXTIME)
 	case IEEE802154_TX_MODE_TXTIME:
 	case IEEE802154_TX_MODE_TXTIME_CCA:
@@ -590,7 +594,7 @@ static uint8_t nrf5_get_acc(const struct device *dev)
 {
 	ARG_UNUSED(dev);
 
-	return CONFIG_IEEE802154_DELAY_TRX_ACC;
+	return CONFIG_IEEE802154_NRF5_DELAY_TRX_ACC;
 }
 
 static int nrf5_start(const struct device *dev)

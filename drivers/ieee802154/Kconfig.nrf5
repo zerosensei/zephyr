@@ -44,7 +44,7 @@ config IEEE802154_NRF5_EXT_IRQ_MGMT
 	  a radio arbiter used in dynamic multiprotocol applications.
 
 config IEEE802154_NRF5_UICR_EUI64_ENABLE
-	bool "Enables using EUI64 value stored in UICR registers"
+	bool "Support usage of EUI64 value stored in UICR registers"
 	depends on !IEEE802154_VENDOR_OUI_ENABLE
 	depends on SOC_SERIES_NRF52X || SOC_SERIES_NRF53X
 	help
@@ -74,5 +74,12 @@ config IEEE802154_NRF5_FCS_IN_LENGTH
 	  Some 802.15.4 L2 implementations expect that FCS length is included in
 	  the overall packet length while others not. Allow to configure this
 	  behavior, based on the selected upper layer.
+
+config IEEE802154_NRF5_DELAY_TRX_ACC
+	int "Clock accuracy for delayed operations"
+	default CLOCK_CONTROL_NRF_ACCURACY
+	help
+	  Accuracy of the clock used for scheduling radio delayed operations (delayed transmission
+	  or delayed reception), in ppm.
 
 endif

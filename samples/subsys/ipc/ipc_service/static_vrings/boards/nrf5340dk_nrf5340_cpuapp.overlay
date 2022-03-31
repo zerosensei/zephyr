@@ -4,9 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <dt-bindings/ipc_service/static_vrings.h>
+
 / {
 	chosen {
 		/delete-property/ zephyr,ipc_shm;
+	};
+
+	soc {
+		peripheral@50000000 {
+			/delete-node/ ipc0;
+		};
 	};
 
 	reserved-memory {
@@ -18,22 +26,6 @@
 
 		sram_ipc1: memory@20078000 {
 			reg = <0x20078000 0x8000>;
-		};
-	};
-
-	soc {
-		peripheral@50000000 {
-			/delete-node/ ipc@2a000;
-
-			mbox: mbox@2a000 {
-				compatible = "nordic,mbox-nrf-ipc";
-				reg = <0x2a000 0x1000>;
-				tx-mask = <0x0000ffff>;
-				rx-mask = <0x0000ffff>;
-				interrupts = <42 NRF_DEFAULT_IRQ_PRIORITY>;
-				#mbox-cells = <1>;
-				status = "okay";
-			};
 		};
 	};
 
@@ -52,6 +44,7 @@
 		mboxes = <&mbox 2>, <&mbox 3>;
 		mbox-names = "tx", "rx";
 		role = "host";
+		zephyr,priority = <1 PRIO_COOP>;
 		status = "okay";
 	};
 };

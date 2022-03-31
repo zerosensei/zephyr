@@ -78,7 +78,7 @@ extern void test_ringbuffer_item_stress(void);
  *
  * Expected Test Result:
  * - Data items pushed shall be equal to what are gotten. And
- * An error shall be shown up when an item is put into a full ringbutter or
+ * An error shall be shown up when an item is put into a full ringbuffer or
  * get some items from an empty ringbuffer.
  *
  * Pass/Fail Criteria:
@@ -119,7 +119,7 @@ void test_ring_buffer_main(void)
 	ret = ring_buf_item_get(&ring_buf1, &gettype, &getval,
 				getdata, &getsize);
 	if (ret != -EMSGSIZE) {
-		LOG_DBG("Allowed retreival with insufficient "
+		LOG_DBG("Allowed retrieval with insufficient "
 			"destination buffer space");
 		zassert_true((getsize == INITIAL_SIZE),
 			     "Correct size wasn't reported back to the caller");
@@ -569,11 +569,11 @@ void test_ringbuffer_alloc_put(void)
 	zassert_true(err == 0, NULL);
 
 	err = ring_buf_put_finish(&ringbuf_raw, RINGBUFFER_SIZE - 1);
-	zassert_true(err == 0, NULL);
+	zassert_true(err == -EINVAL, NULL);
 
 	read_size = ring_buf_get(&ringbuf_raw, outputbuf,
 					     RINGBUFFER_SIZE);
-	zassert_true(read_size == RINGBUFFER_SIZE, NULL);
+	zassert_true(read_size == 1, NULL);
 
 	for (int i = 0; i < 10; i++) {
 		allocated = ring_buf_put_claim(&ringbuf_raw, &data, 2);

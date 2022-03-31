@@ -21,7 +21,6 @@ static struct bt_vcs *vcs;
 static struct bt_vcs_included vcs_included;
 static volatile bool g_bt_init;
 static volatile bool g_is_connected;
-static volatile bool g_mtu_exchanged;
 static volatile bool g_discovery_complete;
 static volatile bool g_write_complete;
 
@@ -41,7 +40,6 @@ static volatile uint8_t g_aics_gain_min;
 static volatile bool g_aics_active = 1;
 static char g_aics_desc[AICS_DESC_SIZE];
 static volatile bool g_cb;
-static struct bt_conn *g_conn;
 
 static void vcs_state_cb(struct bt_vcs *vcs, int err, uint8_t volume,
 			 uint8_t mute)
@@ -258,17 +256,6 @@ static struct bt_vcs_cb vcs_cbs = {
 	}
 };
 
-static void mtu_cb(struct bt_conn *conn, uint8_t err,
-		   struct bt_gatt_exchange_params *params)
-{
-	if (err) {
-		FAIL("Failed to exchange MTU (%u)\n", err);
-		return;
-	}
-
-	g_mtu_exchanged = true;
-}
-
 static void connected(struct bt_conn *conn, uint8_t err)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
@@ -276,11 +263,12 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
 	if (err) {
+		bt_conn_unref(default_conn);
+		default_conn = NULL;
 		FAIL("Failed to connect to %s (%u)\n", addr, err);
 		return;
 	}
 	printk("Connected to %s\n", addr);
-	g_conn = conn;
 	g_is_connected = true;
 }
 
@@ -315,7 +303,7 @@ static int test_aics(void)
 		FAIL("Could not get AICS client conn (err %d)\n", err);
 		return err;
 	}
-	if (cached_conn != g_conn) {
+	if (cached_conn != default_conn) {
 		FAIL("Cached conn was not the conn used to discover");
 		return -ENOTCONN;
 	}
@@ -463,7 +451,7 @@ static int test_vocs(void)
 		FAIL("Could not get VOCS client conn (err %d)\n", err);
 		return err;
 	}
-	if (cached_conn != g_conn) {
+	if (cached_conn != default_conn) {
 		FAIL("Cached conn was not the conn used to discover");
 		return -ENOTCONN;
 	}
@@ -547,9 +535,6 @@ static void test_main(void)
 	uint8_t expected_volume;
 	uint8_t previous_volume;
 	uint8_t expected_mute;
-	static struct bt_gatt_exchange_params mtu_params =  {
-		.func = mtu_cb,
-	};
 	struct bt_conn *cached_conn;
 
 	err = bt_enable(bt_ready);
@@ -577,14 +562,7 @@ static void test_main(void)
 
 	WAIT_FOR(g_is_connected);
 
-	err = bt_gatt_exchange_mtu(g_conn, &mtu_params);
-	if (err) {
-		FAIL("Failed to exchange MTU %d", err);
-	}
-
-	WAIT_FOR(g_mtu_exchanged);
-
-	err = bt_vcs_discover(g_conn, &vcs);
+	err = bt_vcs_discover(default_conn, &vcs);
 	if (err) {
 		FAIL("Failed to discover VCS %d", err);
 	}
@@ -603,7 +581,7 @@ static void test_main(void)
 		FAIL("Could not get VCS client conn (err %d)\n", err);
 		return;
 	}
-	if (cached_conn != g_conn) {
+	if (cached_conn != default_conn) {
 		FAIL("Cached conn was not the conn used to discover");
 		return;
 	}

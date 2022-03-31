@@ -17,12 +17,16 @@
 /* Group 0 of INTC */
 #define IT8XXX2_IRQ_WU20        1
 #define IT8XXX2_IRQ_KBC_OBE     2
+#define IT8XXX2_IRQ_SMB_D       4
 #define IT8XXX2_IRQ_WU23        6
 /* Group 1 */
+#define IT8XXX2_IRQ_SMB_A       9
+#define IT8XXX2_IRQ_SMB_B       10
 #define IT8XXX2_IRQ_WU26        12
 #define IT8XXX2_IRQ_WKINTC      13
 #define IT8XXX2_IRQ_WU25        14
 /* Group 2 */
+#define IT8XXX2_IRQ_SMB_C       16
 #define IT8XXX2_IRQ_WU24        17
 #define IT8XXX2_IRQ_WU22        21
 /* Group 3 */
@@ -133,7 +137,10 @@
 #define IT8XXX2_IRQ_WU124       145
 #define IT8XXX2_IRQ_WU125       146
 #define IT8XXX2_IRQ_WU126       147
+#define IT8XXX2_IRQ_V_CMP       151
 /* Group 19 */
+#define IT8XXX2_IRQ_SMB_E       152
+#define IT8XXX2_IRQ_SMB_F       153
 #define IT8XXX2_IRQ_TIMER3      155
 #define IT8XXX2_IRQ_TIMER4      156
 #define IT8XXX2_IRQ_TIMER5      157

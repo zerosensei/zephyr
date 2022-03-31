@@ -41,9 +41,6 @@ extern "C" {
  */
 
 struct net_context;
-struct canbus_net_isotp_tx_ctx;
-struct canbus_net_isotp_rx_ctx;
-
 
 /* buffer cursor used in net_pkt */
 struct net_pkt_cursor {
@@ -261,12 +258,6 @@ struct net_pkt {
 	uint32_t ieee802154_ack_fc; /* Frame counter set in the ACK */
 	uint8_t ieee802154_ack_keyid; /* Key index set in the ACK */
 #endif
-#endif
-#if defined(CONFIG_NET_L2_CANBUS)
-	union {
-		struct canbus_isotp_tx_ctx *canbus_tx_ctx;
-		struct canbus_isotp_rx_ctx *canbus_rx_ctx;
-	};
 #endif
 	/* @endcond */
 };
@@ -1770,7 +1761,7 @@ size_t net_pkt_available_payload_buffer(struct net_pkt *pkt,
 /**
  * @brief Trim net_pkt buffer
  *
- * @details This will basically check for unused buffers and deallocates
+ * @details This will basically check for unused buffers and deallocate
  *          them relevantly
  *
  * @param pkt The net_pkt which buffer will be trimmed
@@ -1896,7 +1887,8 @@ int net_pkt_copy(struct net_pkt *pkt_dst,
 		 size_t length);
 
 /**
- * @brief Clone pkt and its buffer.
+ * @brief Clone pkt and its buffer. The cloned packet will be allocated on
+ *        the same pool as the original one.
  *
  * @param pkt Original pkt to be cloned
  * @param timeout Timeout to wait for free buffer
@@ -1904,6 +1896,17 @@ int net_pkt_copy(struct net_pkt *pkt_dst,
  * @return NULL if error, cloned packet otherwise.
  */
 struct net_pkt *net_pkt_clone(struct net_pkt *pkt, k_timeout_t timeout);
+
+/**
+ * @brief Clone pkt and its buffer. The cloned packet will be allocated on
+ *        the RX packet poll.
+ *
+ * @param pkt Original pkt to be cloned
+ * @param timeout Timeout to wait for free buffer
+ *
+ * @return NULL if error, cloned packet otherwise.
+ */
+struct net_pkt *net_pkt_rx_clone(struct net_pkt *pkt, k_timeout_t timeout);
 
 /**
  * @brief Clone pkt and increase the refcount of its buffer.

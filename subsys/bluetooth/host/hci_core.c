@@ -85,6 +85,9 @@ struct bt_dev bt_dev = {
 #if !defined(CONFIG_BT_RECV_IS_RX_THREAD)
 	.rx_queue      = Z_FIFO_INITIALIZER(bt_dev.rx_queue),
 #endif
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC)
+	.appearance = CONFIG_BT_DEVICE_APPEARANCE,
+#endif
 };
 
 static bt_ready_cb_t ready_cb;
@@ -194,7 +197,7 @@ void bt_hci_host_num_completed_packets(struct net_buf *buf)
 	}
 
 	if (conn->state != BT_CONN_CONNECTED &&
-	    conn->state != BT_CONN_DISCONNECT) {
+	    conn->state != BT_CONN_DISCONNECTING) {
 		BT_WARN("Not reporting packet for non-connected conn");
 		bt_conn_unref(conn);
 		return;
@@ -763,7 +766,7 @@ static void hci_disconn_complete(struct net_buf *buf)
 
 #if defined(CONFIG_BT_CENTRAL) && !defined(CONFIG_BT_FILTER_ACCEPT_LIST)
 	if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
-		bt_conn_set_state(conn, BT_CONN_CONNECT_SCAN);
+		bt_conn_set_state(conn, BT_CONN_CONNECTING_SCAN);
 		bt_le_scan_update(false);
 	}
 #endif /* defined(CONFIG_BT_CENTRAL) && !defined(CONFIG_BT_FILTER_ACCEPT_LIST) */
@@ -896,11 +899,11 @@ static struct bt_conn *find_pending_connect(uint8_t role, bt_addr_le_t *peer_add
 	 */
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) && role == BT_HCI_ROLE_CENTRAL) {
 		conn = bt_conn_lookup_state_le(BT_ID_DEFAULT, peer_addr,
-					       BT_CONN_CONNECT);
+					       BT_CONN_CONNECTING);
 		if (IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST) && !conn) {
 			conn = bt_conn_lookup_state_le(BT_ID_DEFAULT,
 						       BT_ADDR_LE_NONE,
-						       BT_CONN_CONNECT_AUTO);
+						       BT_CONN_CONNECTING_AUTO);
 		}
 
 		return conn;
@@ -908,11 +911,11 @@ static struct bt_conn *find_pending_connect(uint8_t role, bt_addr_le_t *peer_add
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && role == BT_HCI_ROLE_PERIPHERAL) {
 		conn = bt_conn_lookup_state_le(bt_dev.adv_conn_id, peer_addr,
-					       BT_CONN_CONNECT_DIR_ADV);
+					       BT_CONN_CONNECTING_DIR_ADV);
 		if (!conn) {
 			conn = bt_conn_lookup_state_le(bt_dev.adv_conn_id,
 						       BT_ADDR_LE_NONE,
-						       BT_CONN_CONNECT_ADV);
+						       BT_CONN_CONNECTING_ADV);
 		}
 
 		return conn;
@@ -1038,7 +1041,7 @@ static void le_conn_complete_cancel(void)
 		/* Check if device is marked for autoconnect. */
 		if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
 			/* Restart passive scanner for device */
-			bt_conn_set_state(conn, BT_CONN_CONNECT_SCAN);
+			bt_conn_set_state(conn, BT_CONN_CONNECTING_SCAN);
 		}
 	} else {
 		if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
@@ -1649,8 +1652,13 @@ static void unpair(uint8_t id, const bt_addr_le_t *addr)
 	bt_gatt_clear(id, addr);
 
 #if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)
-	if (bt_auth && bt_auth->bond_deleted) {
-		bt_auth->bond_deleted(id, addr);
+	struct bt_conn_auth_info_cb *listener, *next;
+
+	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&bt_auth_info_cbs, listener,
+					  next, node) {
+		if (listener->bond_deleted) {
+			listener->bond_deleted(id, addr);
+		}
 	}
 #endif /* defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR) */
 }
@@ -2647,7 +2655,7 @@ static int common_init(void)
 	read_supported_commands_complete(rsp);
 	net_buf_unref(rsp);
 
-	if (IS_ENABLED(CONFIG_BT_HOST_CRYPTO)) {
+	if (IS_ENABLED(CONFIG_BT_HOST_CRYPTO_PRNG)) {
 		/* Initialize the PRNG so that it is safe to use it later
 		 * on in the initialization process.
 		 */
@@ -2793,7 +2801,7 @@ static int le_init_iso(void)
 	int err;
 	struct net_buf *rsp;
 
-	/* Set Isochronus Channels - Host support */
+	/* Set Isochronous Channels - Host support */
 	err = le_set_host_feature(BT_LE_FEAT_BIT_ISO_CHANNELS, 1);
 	if (err) {
 		return err;
@@ -3571,6 +3579,8 @@ int bt_enable(bt_ready_cb_t cb)
 		return -ENODEV;
 	}
 
+	atomic_clear_bit(bt_dev.flags, BT_DEV_DISABLE);
+
 	if (atomic_test_and_set_bit(bt_dev.flags, BT_DEV_ENABLE)) {
 		return -EALREADY;
 	}
@@ -3627,6 +3637,61 @@ int bt_enable(bt_ready_cb_t cb)
 	return 0;
 }
 
+int bt_disable(void)
+{
+	int err;
+
+	if (!bt_dev.drv) {
+		BT_ERR("No HCI driver registered");
+		return -ENODEV;
+	}
+
+	if (!bt_dev.drv->close) {
+		return -ENOTSUP;
+	}
+
+	if (atomic_test_and_set_bit(bt_dev.flags, BT_DEV_DISABLE)) {
+		return -EALREADY;
+	}
+
+	/* Clear BT_DEV_READY before disabling HCI link */
+	atomic_clear_bit(bt_dev.flags, BT_DEV_READY);
+
+	err = bt_dev.drv->close();
+	if (err) {
+		BT_ERR("HCI driver close failed (%d)", err);
+
+		/* Re-enable BT_DEV_READY to avoid inconsistent stack state */
+		atomic_set_bit(bt_dev.flags, BT_DEV_READY);
+
+		return err;
+	}
+
+	/* Abort TX thread */
+	k_thread_abort(&tx_thread_data);
+
+#if !defined(CONFIG_BT_RECV_IS_RX_THREAD)
+	/* Abort RX thread */
+	k_thread_abort(&rx_thread_data);
+#endif
+
+	if (IS_ENABLED(CONFIG_BT_TINYCRYPT_ECC)) {
+		bt_hci_ecc_deinit();
+	}
+
+	bt_monitor_send(BT_MONITOR_CLOSE_INDEX, NULL, 0);
+
+	/* Clear BT_DEV_ENABLE here to prevent early bt_enable() calls */
+	atomic_clear_bit(bt_dev.flags, BT_DEV_ENABLE);
+
+	return 0;
+}
+
+bool bt_is_ready(void)
+{
+	return atomic_test_bit(bt_dev.flags, BT_DEV_READY);
+}
+
 #define DEVICE_NAME_LEN (sizeof(CONFIG_BT_DEVICE_NAME) - 1)
 #if defined(CONFIG_BT_DEVICE_NAME_DYNAMIC)
 BUILD_ASSERT(DEVICE_NAME_LEN < CONFIG_BT_DEVICE_NAME_MAX);
@@ -3672,6 +3737,33 @@ const char *bt_get_name(void)
 	return CONFIG_BT_DEVICE_NAME;
 #endif
 }
+
+uint16_t bt_get_appearance(void)
+{
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC)
+	return bt_dev.appearance;
+#else
+	return CONFIG_BT_DEVICE_APPEARANCE;
+#endif
+}
+
+#if defined(CONFIG_BT_DEVICE_APPEARANCE_DYNAMIC)
+int bt_set_appearance(uint16_t appearance)
+{
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		int err = settings_save_one("bt/appearance", &appearance, sizeof(appearance));
+
+		if (err) {
+			BT_ERR("Unable to save setting 'bt/appearance' (err %d).", err);
+			return err;
+		}
+	}
+
+	bt_dev.appearance = appearance;
+
+	return 0;
+}
+#endif
 
 bool bt_addr_le_is_bonded(uint8_t id, const bt_addr_le_t *addr)
 {

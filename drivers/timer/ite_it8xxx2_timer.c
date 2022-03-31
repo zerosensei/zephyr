@@ -22,6 +22,18 @@ LOG_MODULE_REGISTER(timer, LOG_LEVEL_ERR);
 /* Event timer max count is 512 sec (base on clock source 32768Hz) */
 #define EVENT_TIMER_MAX_CNT	0x00FFFFFFUL
 
+/* Busy wait low timer configurations */
+#define BUSY_WAIT_L_TIMER	EXT_TIMER_5
+#define BUSY_WAIT_L_TIMER_IRQ	DT_INST_IRQ_BY_IDX(0, 2, irq)
+#define BUSY_WAIT_L_TIMER_FLAG	DT_INST_IRQ_BY_IDX(0, 2, flags)
+
+/* Busy wait high timer configurations */
+#define BUSY_WAIT_H_TIMER	EXT_TIMER_6
+#define BUSY_WAIT_H_TIMER_IRQ	DT_INST_IRQ_BY_IDX(0, 3, irq)
+#define BUSY_WAIT_H_TIMER_FLAG	DT_INST_IRQ_BY_IDX(0, 3, flags)
+/* Busy wait high timer max count is 71.58min (base on clock source 1MHz) */
+#define BUSY_WAIT_TIMER_H_MAX_CNT 0xFFFFFFFFUL
+
 #ifdef CONFIG_SOC_IT8XXX2_PLL_FLASH_48M
 /*
  * One shot timer configurations
@@ -41,13 +53,13 @@ LOG_MODULE_REGISTER(timer, LOG_LEVEL_ERR);
  * One system (kernel) tick is as how much HW timer counts
  *
  * NOTE: Event and free run timer individually select the same clock source
- *       frequency, so they can use the same HW_CNT_PER_SYS_TICK to tranform
+ *       frequency, so they can use the same HW_CNT_PER_SYS_TICK to transform
  *       unit between HW count and system tick. If clock source frequency is
- *       different, then we should define another to tranform.
+ *       different, then we should define another to transform.
  */
 #define HW_CNT_PER_SYS_TICK	(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC \
 				 / CONFIG_SYS_CLOCK_TICKS_PER_SEC)
-/* Event timer max count is as how much system (kernal) tick */
+/* Event timer max count is as how much system (kernel) tick */
 #define EVEN_TIMER_MAX_CNT_SYS_TICK	(EVENT_TIMER_MAX_CNT \
 					/ HW_CNT_PER_SYS_TICK)
 
@@ -122,6 +134,39 @@ void timer_5ms_one_shot(void)
 }
 #endif /* CONFIG_SOC_IT8XXX2_PLL_FLASH_48M */
 
+#ifdef CONFIG_ARCH_HAS_CUSTOM_BUSY_WAIT
+void arch_busy_wait(uint32_t usec_to_wait)
+{
+	if (!usec_to_wait) {
+		return;
+	}
+
+	/* Decrease 1us here to calibrate our access registers latency */
+	usec_to_wait--;
+
+	/*
+	 * We want to set the bit(1) re-start busy wait timer as soon
+	 * as possible, so we directly write 0xb instead of | bit(1).
+	 */
+	IT8XXX2_EXT_CTRLX(BUSY_WAIT_L_TIMER) = IT8XXX2_EXT_ETX_COMB_RST_EN;
+
+	for (;;) {
+		uint32_t curr = IT8XXX2_EXT_CNTOX(BUSY_WAIT_H_TIMER);
+
+		if (curr >= usec_to_wait) {
+			break;
+		}
+	}
+}
+#endif
+
+static void evt_timer_enable(void)
+{
+	/* Enable and re-start event timer */
+	IT8XXX2_EXT_CTRLX(EVENT_TIMER) |= (IT8XXX2_EXT_ETXEN |
+					   IT8XXX2_EXT_ETXRST);
+}
+
 static void evt_timer_isr(const void *unused)
 {
 	ARG_UNUSED(unused);
@@ -134,7 +179,7 @@ static void evt_timer_isr(const void *unused)
 	if (IS_ENABLED(CONFIG_TICKLESS_KERNEL)) {
 		/*
 		 * Get free run observer count from last time announced and
-		 * trnaform unit to system tick
+		 * transform unit to system tick
 		 */
 		uint32_t dticks = (~(IT8XXX2_EXT_CNTOX(FREE_RUN_TIMER)) -
 				   last_announced_hw_cnt) / HW_CNT_PER_SYS_TICK;
@@ -142,10 +187,8 @@ static void evt_timer_isr(const void *unused)
 
 		sys_clock_announce(dticks);
 	} else {
-		/* Enable and re-start event timer */
-		IT8XXX2_EXT_CTRLX(EVENT_TIMER) |= (IT8XXX2_EXT_ETXEN |
-						   IT8XXX2_EXT_ETXRST);
-
+		/* enable event timer */
+		evt_timer_enable();
 		/* Informs kernel that one system tick has elapsed */
 		sys_clock_announce(1);
 	}
@@ -215,11 +258,8 @@ void sys_clock_set_timeout(int32_t ticks, bool idle)
 	/* W/C event timer interrupt status */
 	ite_intc_isr_clear(EVENT_TIMER_IRQ);
 
-	/*
-	 * When timer enable bit is from 0->1, timer will reload counts and
-	 * start countdown.
-	 */
-	IT8XXX2_EXT_CTRLX(EVENT_TIMER) |= IT8XXX2_EXT_ETXEN;
+	/* enable event timer */
+	evt_timer_enable();
 
 	k_spin_unlock(&lock, key);
 
@@ -236,7 +276,7 @@ uint32_t sys_clock_elapsed(void)
 	/* Critical section */
 	k_spinlock_key_t key = k_spin_lock(&lock);
 	/*
-	 * Get free run observer count from last time announced and trnaform
+	 * Get free run observer count from last time announced and transform
 	 * unit to system tick
 	 */
 	uint32_t dticks = (~(IT8XXX2_EXT_CNTOX(FREE_RUN_TIMER)) -
@@ -249,7 +289,7 @@ uint32_t sys_clock_elapsed(void)
 uint32_t sys_clock_cycle_get_32(void)
 {
 	/*
-	 * Get free run observer count and trnaform unit to system tick
+	 * Get free run observer count and transform unit to system tick
 	 *
 	 * NOTE: Timer is counting down from 0xffffffff. In not combined
 	 *       mode, the observer count value is the same as count, so after
@@ -369,6 +409,38 @@ static int sys_clock_driver_init(const struct device *dev)
 	if (ret < 0) {
 		LOG_ERR("Init event timer failed");
 		return ret;
+	}
+
+	if (IS_ENABLED(CONFIG_ARCH_HAS_CUSTOM_BUSY_WAIT)) {
+		/* Set timer5 and timer6 combinational mode for busy wait */
+		IT8XXX2_EXT_CTRLX(BUSY_WAIT_L_TIMER) |= IT8XXX2_EXT_ETXCOMB;
+
+		/* Set 32-bit timer6 to count-- every 1us */
+		ret = timer_init(BUSY_WAIT_H_TIMER, EXT_PSR_8M, EXT_RAW_CNT,
+				 BUSY_WAIT_TIMER_H_MAX_CNT, EXT_FIRST_TIME_ENABLE,
+				 BUSY_WAIT_H_TIMER_IRQ, BUSY_WAIT_H_TIMER_FLAG,
+				 EXT_WITHOUT_TIMER_INT, EXT_START_TIMER);
+		if (ret < 0) {
+			LOG_ERR("Init busy wait high timer failed");
+			return ret;
+		}
+
+		/*
+		 * Set 24-bit timer5 to overflow every 1us
+		 * NOTE: When the timer5 count down to overflow in combinational
+		 *       mode, timer6 counter will automatically decrease one count
+		 *       and timer5 will automatically re-start counting down
+		 *       from 0x7. Timer5 clock source is 8MHz (=0.125ns), so the
+		 *       time period from 0x7 to overflow is 0.125ns * 8 = 1us.
+		 */
+		ret = timer_init(BUSY_WAIT_L_TIMER, EXT_PSR_8M, EXT_RAW_CNT,
+				 0x7, EXT_FIRST_TIME_ENABLE,
+				 BUSY_WAIT_L_TIMER_IRQ, BUSY_WAIT_L_TIMER_FLAG,
+				 EXT_WITHOUT_TIMER_INT, EXT_START_TIMER);
+		if (ret < 0) {
+			LOG_ERR("Init busy wait low timer failed");
+			return ret;
+		}
 	}
 
 	return 0;

@@ -1409,16 +1409,31 @@ uint8_t ll_adv_enable(uint8_t enable)
 				sync_is_started = 1U;
 
 				lll_adv_data_enqueue(lll, pri_idx);
+			} else {
+				/* TODO: Find the anchor before the group of
+				 *       active Periodic Advertising events, so
+				 *       that auxiliary sets are grouped such
+				 *       that auxiliary sets and Periodic
+				 *       Advertising sets are non-overlapping
+				 *       for the same event interval.
+				 */
 			}
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC */
 
 			/* Keep aux interval equal or higher than primary PDU
 			 * interval.
+			 * Use periodic interval units to represent the
+			 * periodic behavior of scheduling of AUX_ADV_IND PDUs
+			 * so that it is grouped with similar interval units
+			 * used for ACL Connections, Periodic Advertising and
+			 * BIG radio events.
 			 */
-			aux->interval = adv->interval +
-					(HAL_TICKER_TICKS_TO_US(
-						ULL_ADV_RANDOM_DELAY) /
-						ADV_INT_UNIT_US);
+			aux->interval =
+				ceiling_fraction(((uint64_t)adv->interval *
+						  ADV_INT_UNIT_US) +
+						 HAL_TICKER_TICKS_TO_US(
+							ULL_ADV_RANDOM_DELAY),
+						 PERIODIC_INT_UNIT_US);
 
 			ret = ull_adv_aux_start(aux, ticks_anchor_aux,
 						ticks_slot_overhead_aux);
@@ -1492,7 +1507,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 		ull_filter_adv_scan_state_cb(BIT(0) | BIT(1));
 	}
 #else /* !CONFIG_BT_HCI_MESH_EXT */
-	if (IS_ENABLED(CONFIG_BT_OBSERVER) && !ull_scan_is_enabled_get(0)) {
+	if (!IS_ENABLED(CONFIG_BT_OBSERVER) || !ull_scan_is_enabled_get(0)) {
 		ull_filter_adv_scan_state_cb(BIT(0));
 	}
 #endif /* !CONFIG_BT_HCI_MESH_EXT */
@@ -1820,7 +1835,7 @@ static uint32_t ticker_update_rand(struct ll_adv_set *adv, uint32_t ticks_delay_
 	uint32_t ret;
 
 	/* Get pseudo-random number in the range [0..ticks_delay_window].
-	 * Please note that using modulo of 2^32 samle space has an uneven
+	 * Please note that using modulo of 2^32 sample space has an uneven
 	 * distribution, slightly favoring smaller values.
 	 */
 	lll_rand_isr_get(&random_delay, sizeof(random_delay));
@@ -2637,7 +2652,7 @@ static inline uint8_t disable(uint8_t handle)
 	adv->is_enabled = 0U;
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
-	if (IS_ENABLED(CONFIG_BT_OBSERVER) && !ull_scan_is_enabled_get(0)) {
+	if (!IS_ENABLED(CONFIG_BT_OBSERVER) || !ull_scan_is_enabled_get(0)) {
 		ull_filter_adv_scan_state_cb(0);
 	}
 #endif /* CONFIG_BT_CTLR_PRIVACY */
