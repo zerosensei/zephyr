@@ -1,0 +1,16 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+description: CH32 HSE Clock
+
+compatible: "wch,ch32-hse-clock"
+
+include: [fixed-clock.yaml]
+
+properties:
+    hse-bypass:
+      type: boolean
+      required: false
+      description: |
+        HSE crystal oscillator bypass
+        Set to the property to by-pass the oscillator with an external clock.

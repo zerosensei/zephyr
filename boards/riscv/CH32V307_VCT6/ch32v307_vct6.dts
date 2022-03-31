@@ -1,0 +1,109 @@
+/*
+ * Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+ /dts-v1/;
+ #include <wch/ch32v307_vct6.dtsi>
+ 
+ / {
+	 model = "ch32v307_vct6 board";
+	 compatible = "wch,ch32v307";
+ 
+	 chosen {
+		 zephyr,console = &usart1;
+		 zephyr,shell-uart = &usart1;
+		 zephyr,sram = &sram0;
+		 zephyr,flash = &flash0;
+	 };
+ 
+	 leds {
+		 compatible = "gpio-leds";
+		 green_led_1: led_1 {
+			 gpios = <&gpioc 0 GPIO_ACTIVE_LOW>;
+			 label = "User LD1";
+		 };
+	 };
+ 
+	 aliases {
+		 led0 = &green_led_1;
+	 };
+ };
+ 
+ &clk_hse {
+	 clock-frequency = <DT_FREQ_M(8)>;
+	 status = "okay";
+ };
+ 
+ &pll {
+	 mul = <9>;
+	 clocks = <&clk_hse>;
+	 status = "okay";
+ };
+ 
+ &rcc {
+	 clocks = <&pll>;
+	 clock-frequency = <DT_FREQ_M(144)>;
+	 ahb-prescaler = <1>;
+	 apb1-prescaler = <2>;
+	 apb2-prescaler = <1>;
+ };
+
+ 
+ &usart1 {
+	 status = "okay";
+	 current-speed = <115200>;
+	 tx-pin = <68>;
+	 rx-pin = <69>;
+	 rx-pull-up;
+ };
+ 
+//  &i2c1 {
+// 	 pinctrl-0 = <&i2c1_scl_pb8 &i2c1_sda_pb9>;
+// 	 pinctrl-names = "default";
+// 	 status = "okay";
+// 	 clock-frequency = <I2C_BITRATE_FAST>;
+//  };
+ 
+//  &spi1 {
+// 	 pinctrl-0 = <&spi1_nss_master_pa4 &spi1_sck_master_pa5
+// 			  &spi1_miso_master_pa6 &spi1_mosi_master_pa7>;
+// 	 pinctrl-names = "default";
+// 	 status = "okay";
+//  };
+ 
+//  &spi2 {
+// 	 pinctrl-0 = <&spi2_nss_master_pb12 &spi2_sck_master_pb13
+// 			  &spi2_miso_master_pb14 &spi2_mosi_master_pb15>;
+// 	 pinctrl-names = "default";
+// 	 status = "okay";
+//  };
+ 
+//  &iwdg {
+// 	 status = "okay";
+//  };
+ 
+//  &timers1 {
+// 	 st,prescaler = <10000>;
+// 	 status = "okay";
+ 
+// 	 pwm1: pwm {
+// 		 status = "okay";
+// 		 pinctrl-0 = <&tim1_ch1_pwm_pa8>;
+// 		 pinctrl-names = "default";
+// 	 };
+//  };
+ 
+//  &usb {
+// 	 pinctrl-0 = <&usb_dm_pa11 &usb_dp_pa12>;
+// 	 pinctrl-names = "default";
+// 	 status = "okay";
+//  };
+ 
+//  &adc1 {
+// 	 pinctrl-0 = <&adc1_in0_pa0>;
+// 	 pinctrl-names = "default";
+// 	 status = "okay";
+//  };
+ 

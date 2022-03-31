@@ -1,0 +1,16 @@
+identifier: ch32v307_vct6
+name: CH32V307 evt board
+type: mcu
+arch: riscv
+toolchain:
+  - zephyr
+ram: 64
+flash: 256
+supported:
+  - gpio
+  # - i2c
+  # - spi
+  # - pwm
+  # - watchdog
+  # - adc
+
