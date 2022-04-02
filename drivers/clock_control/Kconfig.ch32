@@ -1,0 +1,96 @@
+# CH32 MCU clock control driver config
+
+# Copyright (c) 2022 Nanjing Qinheng Microelectronics Co., Ltd.
+
+# SPDX-License-Identifier: Apache-2.0
+
+
+menuconfig CLOCK_CONTROL_CH32
+	bool "CH32 Reset & Clock Control"
+	depends on SOC_FAMILY_CH32
+	help
+	  Enable driver for Reset & Clock Control subsystem found
+	  in CH32 family of MCUs
+
+if CLOCK_CONTROL_CH32
+
+DT_CH32_HSE_CLOCK := $(dt_nodelabel_path,clk_hse)
+DT_CH32_HSE_CLOCK_FREQ := $(dt_node_int_prop_int,$(DT_CH32_HSE_CLOCK),clock-frequency)
+
+config CLOCK_CH32_HSE_CLOCK
+	int "HSE clock value"
+	default "$(DT_CH32_HSE_CLOCK_FREQ)" if "$(dt_nodelabel_enabled,clk_hse)"
+	default 8000000
+	help
+	  Value of external high-speed clock (HSE). This symbol could be optionally
+	  configured using device tree by setting "clock-frequency" value of clk_hse
+	  node. For instance:
+	  &clk_hse{
+	  status = "okay";
+	  clock-frequency = <DT_FREQ_M(25)>;
+	  };
+	  Note: Device tree configuration is overridden when current symbol is set:
+	  CONFIG_CLOCK_CH32_HSE_CLOCK=32000000
+
+# Micro-controller Clock output configuration options
+
+choice
+	prompt "CH32 MCO Clock Source"
+	default CLOCK_CH32_MCO_SRC_NOCLOCK
+
+config CLOCK_CH32_MCO_SRC_NOCLOCK
+	bool "NOCLOCK"
+	help
+	  MCO output disabled, no clock on MCO
+
+config CLOCK_CH32_MCO_SRC_SYSCLK
+	bool "SYSCLK"
+	depends on SOC_CH32V30X
+	help
+	  Use SYSCLK as source of MCO
+
+config CLOCK_CH32_MCO_SRC_HSI
+	bool "HSI"
+	depends on SOC_CH32V30X
+	help
+	  Use HSI as source of MCO
+
+config CLOCK_CH32_MCO_SRC_HSE
+	bool "HSE"
+	depends on SOC_CH32V30X
+	help
+	  Use HSE as source of MCO
+
+config CLOCK_CH32_MCO_SRC_PLL_DIV2
+	bool "PLL DIV2"
+	depends on SOC_CH32V30X
+	help
+	  Use PLL as source of MCO, division 2
+
+config CLOCK_CH32_MCO_SRC_PLL2
+	bool "PLL2"
+	depends on SOC_CH32V30X
+	help
+	  Use PLL2 as source of MCO
+
+config CLOCK_CH32_MCO_SRC_PLL3_DIV2
+	bool "PLL3 DIV2"
+	depends on SOC_CH32V30X
+	help
+	  Use PLL3 as source of MCO, division 2
+
+config CLOCK_CH32_MCO_SRC_XT1
+	bool "XI1"
+	depends on SOC_CH32V30X
+	help
+	  Use XI1 as source of MCO
+
+config CLOCK_CH32_MCO_SRC_PLL3
+	bool "PLL3"
+	depends on SOC_CH32V30X
+	help
+	  Use PLL3 as source of MCO
+
+endchoice
+
+endif # CLOCK_CONTROL_CH32

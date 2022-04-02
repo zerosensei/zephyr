@@ -1,0 +1,17 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+choice 
+	prompt "CH32V30x MCU Selection"
+	depends on SOC_CH32V30X
+
+config SOC_CH32V303x
+	bool "CH32V303x"
+
+config SOC_CH32V305
+	bool "CH32V305"
+
+config SOC_CH32V307
+	bool "CH32V307"
+
+endchoice

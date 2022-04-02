@@ -1,0 +1,14 @@
+# ST STM32F401CC MCU configuration options
+
+# Copyright (c) 2019 Linumiz
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_SERIES_CH32V30X
+
+config SOC
+	default	"ch32v307_vct6"
+
+config NUM_IRQS
+	default 100
+
+endif # SOC_SERIES_CH32V30X

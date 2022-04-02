@@ -1,9 +1,13 @@
 # Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
 # SPDX-License-Identifier: Apache-2.0
 
-config SOC_CH32V307
-	bool "CH32V307"
+config SOC_SERIES_CH32V30X
+	bool "CH32V30X Series MCU"
 	select RISCV
 	select RISCV_GP
 	select DYNAMIC_INTERRUPTS
 	select CLOCK_CONTROL
+	select HAS_CH32_DRIVERS
+	select CPU_HAS_FPU
+	help
+		Enable support for CH32V30X MCU series

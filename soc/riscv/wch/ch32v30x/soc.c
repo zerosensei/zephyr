@@ -22,7 +22,7 @@
  *
  * @return 0
  */
-static int ch32v307_init(const struct device *arg)
+static int ch32v30x_init(const struct device *arg)
 {
 	uint32_t key;
 
@@ -44,4 +44,4 @@ static int ch32v307_init(const struct device *arg)
 	return 0;
 }
 
-SYS_INIT(ch32v307_init, PRE_KERNEL_1, 0);
+SYS_INIT(ch32v30x_init, PRE_KERNEL_1, 0);
