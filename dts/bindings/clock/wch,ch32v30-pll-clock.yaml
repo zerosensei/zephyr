@@ -27,15 +27,30 @@ description: |
 
 compatible: "wch,ch32v30-pll-clock"
 
-include:
-  - name: wch,ch32v30-pll-clock.yaml
-    property-blocklist:
-      - mul
+include: [clock-controller.yaml, base.yaml]
 
 properties:
+    "#clock-cells":
+      const: 0
+
+    clocks:
+      required: true
+
     mul:
       type: int
       required: true
       description: |
-          PLL multiplication factor for output clock
+          Main PLL multiplication factor for VCO
           Valid range: 2 - 16
+
+    xtpre:
+      type: boolean
+      required: false
+      description: |
+          Otpional HSE divider for PLL entry
+
+    usbpre:
+      type: int
+      required: false
+      description: |
+          Otpional HSE divider for PLL entry

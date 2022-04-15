@@ -1,0 +1,119 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+config SOC_CH32V307
+	depends on SOC_SERIES_CH32V
+	bool
+	select CPU_HAS_FPU
+
+config SOC_CH32V305
+	depends on SOC_SERIES_CH32V
+	bool
+	select CPU_HAS_FPU
+
+config SOC_CH32V303
+	depends on SOC_SERIES_CH32V
+	bool
+	select CPU_HAS_FPU
+
+config SOC_CH32V208
+	depends on SOC_SERIES_CH32V
+	bool
+
+config SOC_CH32V203
+	depends on SOC_SERIES_CH32V
+	bool
+
+choice 
+	prompt "CH32V MCU Selection"
+	depends on SOC_SERIES_CH32V
+
+config SOC_CH32V307_VCT6
+	bool "CH32V307_VCT6"
+	select SOC_CH32V307
+
+config SOC_CH32V307_RCT6
+	bool "CH32V307_RCT6"
+	select SOC_CH32V307
+
+config SOC_CH32V307_WCU6
+	bool "CH32V307_VCT6"
+	select SOC_CH32V307
+
+config SOC_CH32V305_FBP6
+	bool "CH32V305_FBP6"
+	select SOC_CH32V305
+
+config SOC_CH32V305_RBT6
+	bool "CH32V307_RBT6"
+	select SOC_CH32V305
+
+config SOC_CH32V305_RBT6
+	bool "CH32V307_RBT6"
+	select SOC_CH32V305
+
+config SOC_CH32V303_VCT6
+	bool "CH32V303_VCT6"
+	select SOC_CH32V303
+
+config SOC_CH32V303_RCT6
+	bool "CH32V303_RCT6"
+	select SOC_CH32V303
+
+config SOC_CH32V303_RBT6
+	bool "CH32V303_RBT6"
+	select SOC_CH32V303
+
+config SOC_CH32V303_CBT6
+	bool "CH32V303_CBT6"
+	select SOC_CH32V303
+
+config SOC_CH32V208_GBU6
+	bool "CH32V208_GBU6"
+	select SOC_CH32V208
+
+config SOC_CH32V208_CBU6
+	bool "CH32V208_CBU6"
+	select SOC_CH32V208
+
+config SOC_CH32V208_RBT6
+	bool "CH32V208_RBT6"
+	select SOC_CH32V208
+
+config SOC_CH32V208_WBU6
+	bool "CH32V208_WBU6"
+	select SOC_CH32V208
+
+config SOC_CH32V203_F6P6
+	bool "CH32V203_F6P6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_G6P6
+	bool "CH32V203_G6P6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_K6T6
+	bool "CH32V203_K6T6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_K8T6
+	bool "CH32V203_K8T6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_C6T6
+	bool "CH32V203_C6T6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_C8T6
+	bool "CH32V203_C8T6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_C8U6
+	bool "CH32V203_C8U6"
+	select SOC_CH32V203
+
+config SOC_CH32V203_RBT6
+	bool "CH32V203_RBT6"
+	select SOC_CH32V203
+
+endchoice

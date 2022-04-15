@@ -1,0 +1,96 @@
+/*
+ * Copyright (c) 2022 Nanjing Qinheng Microelectronics Co., Ltd.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <wch/ch32v307_vct6.dtsi>
+// #include <ch32v307v_r1-pinctrl.dtsi>
+ 
+/ {
+	model = "ch32v307_vct6 board";
+	compatible = "wch,ch32v307";
+
+	chosen {
+		zephyr,console = &usart1;
+		zephyr,shell-uart = &usart1;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		blue_led_1: led_1 {
+			gpios = <&gpioc 0 GPIO_ACTIVE_LOW>;
+			label = "User LD1";
+		};
+	};
+
+	aliases {
+		led0 = &blue_led_1;
+	};
+};
+
+&clk_hse {
+	clock-frequency = <DT_FREQ_M(8)>;
+	status = "okay";
+};
+
+&pll {
+	mul = <9>;
+	clocks = <&clk_hse>;
+	status = "okay";
+};
+
+&rcc {
+	clocks = <&pll>;
+	clock-frequency = <DT_FREQ_M(72)>;
+	ahb-prescaler = <1>;
+	apb1-prescaler = <2>;
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x00010000>;
+			read-only;
+		};
+		slot0_partition: partition@20000 {
+			label = "image-0";
+			reg = <0x00020000 0x00020000>;
+		};
+		slot1_partition: partition@40000 {
+			label = "image-1";
+			reg = <0x00040000 0x00020000>;
+		};
+		scratch_partition: partition@60000 {
+			label = "image-scratch";
+			reg = <0x00060000 0x00020000>;
+		};
+
+		storage_partition: partition@f8000 {
+			label = "storage";
+			reg = <0x000f8000 0x00008000>;
+		};
+	};
+};
+
+
+&usart1 {
+	status = "okay";
+	current-speed = <115200>;
+	tx-pin = <68>;
+	rx-pin = <69>;
+	rx-pull-up;
+	rts-pin = <70>;
+	cts-pin = <71>;
+	cts-pull-up;
+};
+
+ 

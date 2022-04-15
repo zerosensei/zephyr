@@ -10,12 +10,9 @@ config HAS_CH32_DRIVERS
 
 if HAS_CH32_DRIVERS
 
-
 config USE_CH32_HAL_GPIO
 	bool
 	help
 	  Enable CH32Cube General-purpose I/Os (GPIO) HAL module driver
 
-
-
-endif # HAS_CH32CUBE
+endif

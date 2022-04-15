@@ -1,0 +1,21 @@
+/*
+ * Copyright (c) 2022 Nanjing Qinheng Microelectronics Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+ #include <dt-bindings/pinctrl/ch32v30-pinctrl.h>
+
+/ {
+	soc {
+		pinctrl: pin-controller@40010800 {
+			// usart1_tx_pa9: usart1_tx_pa9 {
+			// 	pinmux = <STM32F1_PINMUX('A', 9, ALTERNATE, USART1_REMAP0)>;
+			// };
+
+			// usart1_rx_pa10: usart1_rx_pa10 {
+			// 	pinmux = <STM32F1_PINMUX('A', 10, GPIO_IN, USART1_REMAP0)>;
+			// };
+
+		};
+	};
+};

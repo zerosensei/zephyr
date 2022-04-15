@@ -1,4 +1,4 @@
-identifier: ch32v307_vct6
+identifier: ch32v307v_r1
 name: CH32V307 evt board
 type: mcu
 arch: riscv

@@ -3,7 +3,7 @@
 # Copyright (c) 2019 Linumiz
 # SPDX-License-Identifier: Apache-2.0
 
-if SOC_SERIES_CH32V30X
+if SOC_CH32V307_VCT6
 
 config SOC
 	default	"ch32v307_vct6"
@@ -11,4 +11,4 @@ config SOC
 config NUM_IRQS
 	default 100
 
-endif # SOC_SERIES_CH32V30X
+endif # SOC_CH32V307_VCT6

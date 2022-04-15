@@ -2,6 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-config BOARD_CH32V307_VCT6
+config BOARD_CH32V307V_R1
 	bool "CH32V307 VCT6 Board"
-	depends on SOC_CH32V307
+	depends on SOC_CH32V307_VCT6
