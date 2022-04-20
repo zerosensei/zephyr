@@ -354,5 +354,13 @@
 			status = "okay";
 			label = "RNG";
 		};
+
+		systimer0: systimer@e000f000{
+			compatible = "wch,ch32-systimer";
+			reg = <0xe000f000 0x18>;
+			interrupts = <12 0>;
+			status = "okay";
+			label = "SYSTIMER_0";
+		};
 	};
 };

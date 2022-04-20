@@ -221,23 +221,23 @@ static int gpio_ch32_init(const struct device *dev)
 			 DT_CLOCKS_CELL(DT_NODELABEL(gpio##__suffix), bits),\
 			 DT_CLOCKS_CELL(DT_NODELABEL(gpio##__suffix), bus))
 
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay)
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay)
 GPIO_DEVICE_INIT_CH32(a, A);
-#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay) */
+// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay) */
 
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay)
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay)
 GPIO_DEVICE_INIT_CH32(b, B);
-#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay) */
+// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay) */
 
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay)
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay)
 GPIO_DEVICE_INIT_CH32(c, C);
-#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay) */
+// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay) */
 
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay)
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay)
 GPIO_DEVICE_INIT_CH32(d, D);
-#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay) */
+// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay) */
 
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay)
+// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay)
 GPIO_DEVICE_INIT_CH32(e, E);
-#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay) */
+// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay) */
 
