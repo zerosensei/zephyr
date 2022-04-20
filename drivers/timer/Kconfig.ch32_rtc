@@ -1,0 +1,37 @@
+# STM32 LPTIM configuration options
+
+# Copyright (c) 2019 STMicroelectronics
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig CH32_RTC_TIMER
+	bool "CH32 Real Time Counter Timer"
+	depends on CLOCK_CONTROL
+	select TICKLESS_CAPABLE
+	help
+	  This module implements a kernel device driver for the Real Time
+	  Counter and provides the standard "system clock driver"
+	  interfaces.
+
+if CH32_RTC_TIMER
+
+choice CH32_RTC_CLOCK
+	prompt "LPTIM clock value configuration"
+
+config CH32_RTC_CLOCK_LSI
+	bool "LSI"
+	help
+	  Use LSI as RTC clock
+
+config CH32_RTC_CLOCK_LSE
+	bool "LSE"
+	help
+	  Use LSE as RTC clock
+
+endchoice
+
+config CH32_RTC_CLOCK
+	int "LPTIM clock value"
+	default 32768 if CH32_RTC_CLOCK_LSE
+	default 32000 if CH32_RTC_CLOCK_LSI
+
+endif # CH32_RTC_TIMER

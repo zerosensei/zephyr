@@ -9,10 +9,7 @@
  * @brief System/hardware module for CH32V307 processor
  */
 
-#include <device.h>
 #include <init.h>
-#include <arch/cpu.h>
-
 /**
  * @brief Perform basic hardware initialization at boot.
  *
@@ -31,8 +28,8 @@ static int ch32v30x_init(const struct device *arg)
 
 	/* Install default handler that simply resets the CPU
 	 * if configured in the kernel, NOP otherwise
-	 */
-	NMI_INIT();
+	 */ 
+	SystemInit();
 
 	irq_unlock(key);
 

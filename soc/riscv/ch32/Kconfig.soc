@@ -1,3 +1,0 @@
-
-
-source "soc/riscv/ch32/*/Kconfig.series"

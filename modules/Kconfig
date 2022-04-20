@@ -81,6 +81,9 @@ comment "CANopenNode module not available."
 comment "FFF module not available."
 	depends on !ZEPHYR_FFF_MODULE
 
+comment "hal_wch module not available."
+	depends on !ZEPHYR_HAL_WCH_MODULE
+
 # This ensures that symbols are available in Kconfig for dependency checking
 # and referencing, while keeping the settings themselves unavailable when the
 # modules are not present in the workspace

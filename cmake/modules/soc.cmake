@@ -44,6 +44,11 @@ else()
   set(SOC_PATH ${SOC_FAMILY}/${SOC_SERIES})
 endif()
 
+message("soc path ${SOC_PATH}")
+message("soc family: ${SOC_FAMILY}")
+message("soc series: ${SOC_SERIES}")
+message("soc name: ${SOC_NAME}")
+
 # Use SOC to search for a 'CMakeLists.txt' file.
 # e.g. zephyr/soc/xtensa/intel_adsp/CMakeLists.txt.
 foreach(root ${SOC_ROOT})

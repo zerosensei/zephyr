@@ -133,13 +133,6 @@ manifest:
       path: modules/hal/stm32
       groups:
         - hal
-
-    - name: hal_wch
-      revision: f1cae48438a1ababa5e27b261f9e2d172afe6cf7
-      path: modules/hal/wch
-      groups:
-        - hal
-
     - name: hal_telink
       revision: ffcfd6282aa213f1dc0848dbca6279b098f6b143
       path: modules/hal/telink
@@ -150,6 +143,13 @@ manifest:
       path: modules/hal/ti
       groups:
         - hal
+
+    - name: hal_wch
+      # revision: f1cae48438a1ababa5e27b261f9e2d172afe6cf1
+      path: modules/hal/wch
+      groups:
+        - hal
+
     - name: hal_xtensa
       revision: 0e577021bb66e644afd067cd9f7c71ab11b62b3d
       path: modules/hal/xtensa

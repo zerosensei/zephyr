@@ -7,11 +7,6 @@
 #ifndef _CH32V30x_SOC_H_
 #define _CH32V30x_SOC_H_
 
-
-#include <ch32v30x.h>
-#include "ch32v30x_common.h"
-
-
 /* ECALL Exception numbers */
 #define SOC_MCAUSE_ECALL_EXP 5 /* Machine ECALL instruction */
 #define SOC_MCAUSE_USER_ECALL_EXP 8 /* User ECALL instruction */
@@ -23,5 +18,10 @@
 
 /* SOC-Specific EXIT ISR command */
 #define SOC_ERET mret
+
+#ifndef _ASMLANGUAGE
+#include <toolchain.h>
+#include <ch32v30x.h>
+#endif  /* !_ASMLANGUAGE */
 
 #endif /* _CH32V307_SOC_H_ */

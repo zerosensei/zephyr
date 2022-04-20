@@ -6,7 +6,7 @@
 
 config HAS_CH32_DRIVERS
 	bool
-	depends on SOC_FAMILY_CH32
+	# depends on SOC_FAMILY_CH32
 
 if HAS_CH32_DRIVERS
 
