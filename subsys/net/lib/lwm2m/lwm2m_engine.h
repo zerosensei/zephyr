@@ -27,6 +27,7 @@
 #define LWM2M_FORMAT_APP_OCTET_STREAM	42
 #define LWM2M_FORMAT_APP_EXI		47
 #define LWM2M_FORMAT_APP_JSON		50
+#define LWM2M_FORMAT_APP_CBOR		60
 #define LWM2M_FORMAT_APP_SEML_JSON	110
 #define LWM2M_FORMAT_OMA_PLAIN_TEXT	1541
 #define LWM2M_FORMAT_OMA_OLD_TLV	1542
@@ -165,6 +166,10 @@ int lwm2m_security_index_to_inst_id(int index);
 int32_t lwm2m_server_get_pmin(uint16_t obj_inst_id);
 int32_t lwm2m_server_get_pmax(uint16_t obj_inst_id);
 int lwm2m_server_short_id_to_inst(uint16_t short_id);
+
+#if defined(CONFIG_LWM2M_SERVER_OBJECT_VERSION_1_1)
+bool lwm2m_server_get_mute_send(uint16_t obj_inst_id);
+#endif
 
 #if defined(CONFIG_LWM2M_FIRMWARE_UPDATE_OBJ_SUPPORT)
 void lwm2m_firmware_set_update_state_inst(uint16_t obj_inst_id, uint8_t state);

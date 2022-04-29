@@ -34,15 +34,15 @@ struct pwm_mcux_data {
 	pwm_signal_param_t channel[CHANNEL_COUNT];
 };
 
-static int mcux_pwm_pin_set(const struct device *dev, uint32_t pwm,
-			    uint32_t period_cycles, uint32_t pulse_cycles,
-			    pwm_flags_t flags)
+static int mcux_pwm_set_cycles(const struct device *dev, uint32_t channel,
+			       uint32_t period_cycles, uint32_t pulse_cycles,
+			       pwm_flags_t flags)
 {
 	const struct pwm_mcux_config *config = dev->config;
 	struct pwm_mcux_data *data = dev->data;
 	uint8_t duty_cycle;
 
-	if (pwm >= CHANNEL_COUNT) {
+	if (channel >= CHANNEL_COUNT) {
 		LOG_ERR("Invalid channel");
 		return -EINVAL;
 	}
@@ -52,10 +52,9 @@ static int mcux_pwm_pin_set(const struct device *dev, uint32_t pwm,
 		return -ENOTSUP;
 	}
 
-	if ((period_cycles == 0) || (pulse_cycles > period_cycles)) {
-		LOG_ERR("Invalid combination: period_cycles=%u, "
-			"pulse_cycles=%u", period_cycles, pulse_cycles);
-		return -EINVAL;
+	if (period_cycles == 0) {
+		LOG_ERR("Channel can not be set to inactive level");
+		return -ENOTSUP;
 	}
 
 	if (period_cycles > UINT16_MAX) {
@@ -69,12 +68,12 @@ static int mcux_pwm_pin_set(const struct device *dev, uint32_t pwm,
 	duty_cycle = 100 * pulse_cycles / period_cycles;
 
 	/* FIXME: Force re-setup even for duty-cycle update */
-	if (period_cycles != data->period_cycles[pwm]) {
+	if (period_cycles != data->period_cycles[channel]) {
 		uint32_t clock_freq;
 		uint32_t pwm_freq;
 		status_t status;
 
-		data->period_cycles[pwm] = period_cycles;
+		data->period_cycles[channel] = period_cycles;
 
 		LOG_DBG("SETUP dutycycle to %u\n", duty_cycle);
 
@@ -92,7 +91,7 @@ static int mcux_pwm_pin_set(const struct device *dev, uint32_t pwm,
 
 		PWM_StopTimer(config->base, 1U << config->index);
 
-		data->channel[pwm].dutyCyclePercent = duty_cycle;
+		data->channel[channel].dutyCyclePercent = duty_cycle;
 
 		status = PWM_SetupPwm(config->base, config->index,
 				      &data->channel[0], CHANNEL_COUNT,
@@ -107,7 +106,7 @@ static int mcux_pwm_pin_set(const struct device *dev, uint32_t pwm,
 		PWM_StartTimer(config->base, 1U << config->index);
 	} else {
 		PWM_UpdatePwmDutycycle(config->base, config->index,
-				       (pwm == 0) ? kPWM_PwmA : kPWM_PwmB,
+				       (channel == 0) ? kPWM_PwmA : kPWM_PwmB,
 				       config->mode, duty_cycle);
 		PWM_SetPwmLdok(config->base, 1U << config->index, true);
 	}
@@ -115,8 +114,8 @@ static int mcux_pwm_pin_set(const struct device *dev, uint32_t pwm,
 	return 0;
 }
 
-static int mcux_pwm_get_cycles_per_sec(const struct device *dev, uint32_t pwm,
-				       uint64_t *cycles)
+static int mcux_pwm_get_cycles_per_sec(const struct device *dev,
+				       uint32_t channel, uint64_t *cycles)
 {
 	const struct pwm_mcux_config *config = dev->config;
 	uint32_t clock_freq;
@@ -168,7 +167,7 @@ static int pwm_mcux_init(const struct device *dev)
 }
 
 static const struct pwm_driver_api pwm_mcux_driver_api = {
-	.pin_set = mcux_pwm_pin_set,
+	.set_cycles = mcux_pwm_set_cycles,
 	.get_cycles_per_sec = mcux_pwm_get_cycles_per_sec,
 };
 

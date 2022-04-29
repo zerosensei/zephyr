@@ -70,19 +70,10 @@
 #include "common/log.h"
 #include "hal/debug.h"
 
-/**
- *  User CPR Interval
- */
-#if !defined(CONFIG_BT_CTLR_USER_CPR_INTERVAL_MIN)
-/* Bluetooth defined CPR Interval Minimum (7.5ms) */
-#define CONN_INTERVAL_MIN(x) (6)
-#else /* CONFIG_BT_CTLR_USER_CPR_INTERVAL_MIN */
-/* Proprietary user defined CPR Interval Minimum */
-extern uint16_t ull_conn_interval_min_get(struct ll_conn *conn);
-#define CONN_INTERVAL_MIN(x) (MAX(ull_conn_interval_min_get(x), 1))
-#endif /* CONFIG_BT_CTLR_USER_CPR_INTERVAL_MIN */
-
 static int init_reset(void);
+#if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
+static void tx_demux_sched(struct ll_conn *conn);
+#endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
 static void tx_demux(void *param);
 static struct node_tx *tx_ull_dequeue(struct ll_conn *conn, struct node_tx *tx);
 
@@ -308,10 +299,8 @@ int ll_tx_mem_enqueue(uint16_t handle, void *tx)
 
 	MFIFO_ENQUEUE(conn_tx, idx);
 
+#if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
 	if (ull_ref_get(&conn->ull)) {
-		static memq_link_t link;
-		static struct mayfly mfy = {0, 0, &link, NULL, tx_demux};
-
 #if defined(CONFIG_BT_CTLR_FORCE_MD_AUTO)
 		if (tx_cnt >= CONFIG_BT_BUF_ACL_TX_COUNT) {
 			uint8_t previous, force_md_cnt;
@@ -325,16 +314,14 @@ int ll_tx_mem_enqueue(uint16_t handle, void *tx)
 		}
 #endif /* CONFIG_BT_CTLR_FORCE_MD_AUTO */
 
-		mfy.param = conn;
-
-		mayfly_enqueue(TICKER_USER_ID_THREAD, TICKER_USER_ID_ULL_HIGH,
-			       0, &mfy);
+		tx_demux_sched(conn);
 
 #if defined(CONFIG_BT_CTLR_FORCE_MD_AUTO)
 	} else {
 		lll_conn_force_md_cnt_set(0U);
 #endif /* CONFIG_BT_CTLR_FORCE_MD_AUTO */
 	}
+#endif /* !CONFIG_BT_CTLR_LOW_LAT_ULL */
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
 		ull_periph_latency_cancel(conn, handle);
@@ -1400,7 +1387,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 #if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 		if (lll->enc_rx || conn->llcp_enc.pause_rx) {
 #else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
-		if (lll->enc_rx || ull_cp_encryption_paused(conn)) {
+		if (lll->enc_rx && lll->enc_tx) {
 #endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 			uint16_t appto_reload_new;
 
@@ -1594,6 +1581,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 	}
 
 	/* check procedure timeout */
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 	if (conn->procedure_expire != 0U) {
 		if (conn->procedure_expire > elapsed_event) {
 			conn->procedure_expire -= elapsed_event;
@@ -1603,6 +1591,13 @@ void ull_conn_done(struct node_rx_event_done *done)
 			return;
 		}
 	}
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+	if (-ETIMEDOUT == ull_cp_prt_elapse(conn, elapsed_event)) {
+		conn_cleanup(conn, BT_HCI_ERR_LL_RESP_TIMEOUT);
+
+		return;
+	}
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 	/* check apto */
@@ -1743,6 +1738,18 @@ void ull_conn_done(struct node_rx_event_done *done)
 			  ((void *)conn == ull_disable_mark_get()));
 	}
 }
+
+#if defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
+void ull_conn_lll_tx_demux_sched(struct lll_conn *lll)
+{
+	static memq_link_t link;
+	static struct mayfly mfy = {0U, 0U, &link, NULL, tx_demux};
+
+	mfy.param = HDR_LLL2ULL(lll);
+
+	mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 1U, &mfy);
+}
+#endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
 
 void ull_conn_tx_demux(uint8_t count)
 {
@@ -2138,6 +2145,18 @@ static int init_reset(void)
 
 	return 0;
 }
+
+#if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
+static void tx_demux_sched(struct ll_conn *conn)
+{
+	static memq_link_t link;
+	static struct mayfly mfy = {0U, 0U, &link, NULL, tx_demux};
+
+	mfy.param = conn;
+
+	mayfly_enqueue(TICKER_USER_ID_THREAD, TICKER_USER_ID_ULL_HIGH, 0U, &mfy);
+}
+#endif /* !CONFIG_BT_CTLR_LOW_LAT_ULL */
 
 static void tx_demux(void *param)
 {
@@ -7601,21 +7620,6 @@ void ull_conn_resume_rx_data(struct ll_conn *conn)
 }
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
-/**
- * @brief Restart procedure timeout 'timer'
- */
-void ull_conn_prt_reload(struct ll_conn *conn, uint16_t procedure_reload)
-{
-	conn->procedure_expire = procedure_reload;
-}
-
-/**
- * @brief Clear procedure timeout 'timer'
- */
-void ull_conn_prt_clear(struct ll_conn *conn)
-{
-	conn->procedure_expire = 0U;
-}
 uint16_t ull_conn_event_counter(struct ll_conn *conn)
 {
 	struct lll_conn *lll;
@@ -7656,12 +7660,6 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 
 	instant_latency = (event_counter - instant) & 0xFFFF;
 
-#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
-	if (!is_cu_proc) {
-		/* Stop procedure timeout */
-		conn->procedure_expire = 0U;
-	}
-#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
 	ticks_at_expire = conn->llcp.prep.ticks_at_expire;
 
@@ -7755,7 +7753,7 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 	lll->latency = latency;
 
 	conn->supervision_reload = RADIO_CONN_EVENTS((timeout * 10U * 1000U), conn_interval_us);
-	conn->procedure_reload = RADIO_CONN_EVENTS((40U * 1000U * 1000U), conn_interval_us);
+	ull_cp_prt_reload_set(conn, conn_interval_us);
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 	/* APTO in no. of connection events */

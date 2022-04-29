@@ -28,7 +28,8 @@ LOG_MODULE_REGISTER(net_tcp, CONFIG_NET_TCP_LOG_LEVEL);
 
 #define ACK_TIMEOUT_MS CONFIG_NET_TCP_ACK_TIMEOUT
 #define ACK_TIMEOUT K_MSEC(ACK_TIMEOUT_MS)
-#define FIN_TIMEOUT_MS MSEC_PER_SEC
+/* Allow for (tcp_retries + 1) transmissions */
+#define FIN_TIMEOUT_MS (tcp_rto * (tcp_retries + 1))
 #define FIN_TIMEOUT K_MSEC(FIN_TIMEOUT_MS)
 
 static int tcp_rto = CONFIG_NET_TCP_INIT_RETRANSMISSION_TIMEOUT;
@@ -1218,10 +1219,12 @@ static void tcp_conn_ref(struct tcp *conn)
 	NET_DBG("conn: %p, ref_count: %d", conn, ref_count);
 }
 
-static struct tcp *tcp_conn_alloc(void)
+static struct tcp *tcp_conn_alloc(struct net_context *context)
 {
 	struct tcp *conn = NULL;
 	int ret;
+	int recv_window = 0;
+	size_t len;
 
 	ret = k_mem_slab_alloc(&tcp_conns_slab, (void **)&conn, K_NO_WAIT);
 	if (ret) {
@@ -1253,6 +1256,14 @@ static struct tcp *tcp_conn_alloc(void)
 	conn->in_connect = false;
 	conn->state = TCP_LISTEN;
 	conn->recv_win = tcp_window;
+
+	/* Set the recv_win with the rcvbuf configured for the socket. */
+	if (IS_ENABLED(CONFIG_NET_CONTEXT_RCVBUF) &&
+		net_context_get_option(context, NET_OPT_RCVBUF, &recv_window, &len) == 0) {
+		if (recv_window != 0) {
+			conn->recv_win = recv_window;
+		}
+	}
 
 	/* The ISN value will be set when we get the connection attempt or
 	 * when trying to create a connection.
@@ -1292,7 +1303,7 @@ int net_tcp_get(struct net_context *context)
 
 	k_mutex_lock(&tcp_lock, K_FOREVER);
 
-	conn = tcp_conn_alloc();
+	conn = tcp_conn_alloc(context);
 	if (conn == NULL) {
 		ret = -ENOMEM;
 		goto out;
@@ -1772,6 +1783,9 @@ static void tcp_in(struct tcp *conn, struct net_pkt *pkt)
 
 	if (th) {
 		size_t max_win;
+		int sndbuf;
+		size_t sndbuf_len;
+
 
 		conn->send_win = ntohs(th_win(th));
 
@@ -1786,6 +1800,17 @@ static void tcp_in(struct tcp *conn, struct net_pkt *pkt)
 			 */
 			max_win = (CONFIG_NET_BUF_TX_COUNT *
 				   CONFIG_NET_BUF_DATA_SIZE) / 3;
+		}
+
+		if (IS_ENABLED(CONFIG_NET_CONTEXT_SNDBUF) &&
+			conn->state != TCP_SYN_SENT &&
+			net_context_get_option(conn->context,
+					       NET_OPT_SNDBUF,
+					       &sndbuf,
+					       &sndbuf_len) == 0) {
+			if (sndbuf > 0) {
+				max_win = sndbuf;
+			}
 		}
 
 		max_win = MAX(max_win, NET_IPV6_MTU);
@@ -2404,11 +2429,10 @@ int net_tcp_connect(struct net_context *context,
 	/* Input of a (nonexistent) packet with no flags set will cause
 	 * a TCP connection to be established
 	 */
+	conn->in_connect = !IS_ENABLED(CONFIG_NET_TEST_PROTOCOL);
 	tcp_in(conn, NULL);
 
 	if (!IS_ENABLED(CONFIG_NET_TEST_PROTOCOL)) {
-		conn->in_connect = true;
-
 		if (k_sem_take(&conn->connect_sem, timeout) != 0 &&
 		    conn->state != TCP_ESTABLISHED) {
 			conn->in_connect = false;

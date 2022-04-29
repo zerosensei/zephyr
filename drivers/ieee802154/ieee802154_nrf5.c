@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <debug/stack.h>
 
 #include <soc.h>
+#include <soc_secure.h>
 #include <device.h>
 #include <init.h>
 #include <debug/stack.h>
@@ -69,16 +70,14 @@ static struct nrf5_802154_data nrf5_data;
 
 #if defined(CONFIG_IEEE802154_NRF5_UICR_EUI64_ENABLE)
 #if defined(CONFIG_SOC_NRF5340_CPUAPP)
+#if defined(CONFIG_TRUSTED_EXECUTION_NONSECURE)
+#error "NRF_UICR->OTP is not supported to read from non-secure"
+#else
 #define EUI64_ADDR (NRF_UICR->OTP)
+#endif /* CONFIG_TRUSTED_EXECUTION_NONSECURE */
 #else
 #define EUI64_ADDR (NRF_UICR->CUSTOMER)
 #endif /* CONFIG_SOC_NRF5340_CPUAPP */
-#else
-#if defined(CONFIG_SOC_NRF5340_CPUAPP) || defined(CONFIG_SOC_NRF5340_CPUNET)
-#define EUI64_ADDR (NRF_FICR->INFO.DEVICEID)
-#else
-#define EUI64_ADDR (NRF_FICR->DEVICEID)
-#endif /* CONFIG_SOC_NRF5340_CPUAPP || CONFIG_SOC_NRF5340_CPUNET */
 #endif /* CONFIG_IEEE802154_NRF5_UICR_EUI64_ENABLE */
 
 #if defined(CONFIG_IEEE802154_NRF5_UICR_EUI64_ENABLE)
@@ -108,15 +107,17 @@ static void nrf5_get_eui64(uint8_t *mac)
 	uint32_t index = 0;
 
 #if !defined(CONFIG_IEEE802154_NRF5_UICR_EUI64_ENABLE)
+	uint32_t deviceid[2];
+
 	/* Set the MAC Address Block Larger (MA-L) formerly called OUI. */
 	mac[index++] = (IEEE802154_NRF5_VENDOR_OUI >> 16) & 0xff;
 	mac[index++] = (IEEE802154_NRF5_VENDOR_OUI >> 8) & 0xff;
 	mac[index++] = IEEE802154_NRF5_VENDOR_OUI & 0xff;
-#endif
 
-#if defined(CONFIG_SOC_NRF5340_CPUAPP) && \
-	defined(CONFIG_TRUSTED_EXECUTION_NONSECURE)
-#error Accessing EUI64 on the non-secure mode is not supported at the moment
+	soc_secure_read_deviceid(deviceid);
+
+	factoryAddress = (uint64_t)deviceid[EUI64_ADDR_HIGH] << 32;
+	factoryAddress |= deviceid[EUI64_ADDR_LOW];
 #else
 	/* Use device identifier assigned during the production. */
 	factoryAddress = (uint64_t)EUI64_ADDR[EUI64_ADDR_HIGH] << 32;
@@ -464,6 +465,73 @@ static bool nrf5_tx_csma_ca(struct net_pkt *pkt, uint8_t *payload)
 #endif
 
 #if IS_ENABLED(CONFIG_NET_PKT_TXTIME)
+/**
+ * @brief Convert 32-bit target time to absolute 64-bit target time.
+ */
+static uint64_t target_time_convert_to_64_bits(uint32_t target_time)
+{
+	/**
+	 * Target time is provided as two 32-bit integers defining a moment in time
+	 * in microsecond domain. In order to use bit-shifting instead of modulo
+	 * division, calculations are performed in microsecond domain, not in RTC ticks.
+	 *
+	 * The target time can point to a moment in the future, but can be overdue
+	 * as well. In order to determine what's the case and correctly set the
+	 * absolute target time, it's necessary to compare the least significant
+	 * 32 bits of the current time, 64-bit time with the provided 32-bit target
+	 * time. Let's assume that half of the 32-bit range can be used for specifying
+	 * target times in the future, and the other half - in the past.
+	 */
+	uint64_t now_us = nrf_802154_time_get();
+	uint32_t now_us_wrapped = (uint32_t)now_us;
+	uint32_t time_diff = target_time - now_us_wrapped;
+	uint64_t result = UINT64_C(0);
+
+	if (time_diff < 0x80000000) {
+		/**
+		 * Target time is assumed to be in the future. Check if a 32-bit overflow
+		 * occurs between the current time and the target time.
+		 */
+		if (now_us_wrapped > target_time) {
+			/**
+			 * Add a 32-bit overflow and replace the least significant 32 bits
+			 * with the provided target time.
+			 */
+			result = now_us + UINT32_MAX + 1;
+			result &= ~(uint64_t)UINT32_MAX;
+			result |= target_time;
+		} else {
+			/**
+			 * Leave the most significant 32 bits and replace the least significant
+			 * 32 bits with the provided target time.
+			 */
+			result = (now_us & (~(uint64_t)UINT32_MAX)) | target_time;
+		}
+	} else {
+		/**
+		 * Target time is assumed to be in the past. Check if a 32-bit overflow
+		 * occurs between the target time and the current time.
+		 */
+		if (now_us_wrapped > target_time) {
+			/**
+			 * Leave the most significant 32 bits and replace the least significant
+			 * 32 bits with the provided target time.
+			 */
+			result = (now_us & (~(uint64_t)UINT32_MAX)) | target_time;
+		} else {
+			/**
+			 * Subtract a 32-bit overflow and replace the least significant
+			 * 32 bits with the provided target time.
+			 */
+			result = now_us - UINT32_MAX - 1;
+			result &= ~(uint64_t)UINT32_MAX;
+			result |= target_time;
+		}
+	}
+
+	return result;
+}
+
 static bool nrf5_tx_at(struct net_pkt *pkt, uint8_t *payload, bool cca)
 {
 	nrf_802154_transmit_at_metadata_t metadata = {
@@ -474,7 +542,7 @@ static bool nrf5_tx_at(struct net_pkt *pkt, uint8_t *payload, bool cca)
 		.cca = cca,
 		.channel = nrf_802154_channel_get(),
 	};
-	uint64_t tx_at = net_pkt_txtime(pkt) / NSEC_PER_USEC;
+	uint64_t tx_at = target_time_convert_to_64_bits(net_pkt_txtime(pkt) / NSEC_PER_USEC);
 	bool ret;
 
 	ret = nrf_802154_transmit_raw_at(payload,
@@ -736,73 +804,6 @@ static void nrf5_config_mac_keys(struct ieee802154_key *mac_keys)
 #endif /* CONFIG_IEEE802154_2015 */
 
 #if defined(CONFIG_IEEE802154_CSL_ENDPOINT)
-/**
- * @brief Convert 32-bit target time to absolute 64-bit target time.
- */
-static uint64_t target_time_convert_to_64_bits(uint32_t target_time)
-{
-	/**
-	 * Target time is provided as two 32-bit integers defining a moment in time
-	 * in microsecond domain. In order to use bit-shifting instead of modulo
-	 * division, calculations are performed in microsecond domain, not in RTC ticks.
-	 *
-	 * The target time can point to a moment in the future, but can be overdue
-	 * as well. In order to determine what's the case and correctly set the
-	 * absolute target time, it's necessary to compare the least significant
-	 * 32 bits of the current time, 64-bit time with the provided 32-bit target
-	 * time. Let's assume that half of the 32-bit range can be used for specifying
-	 * target times in the future, and the other half - in the past.
-	 */
-	uint64_t now_us = nrf_802154_time_get();
-	uint32_t now_us_wrapped = (uint32_t)now_us;
-	uint32_t time_diff = target_time - now_us_wrapped;
-	uint64_t result = UINT64_C(0);
-
-	if (time_diff < 0x80000000) {
-		/**
-		 * Target time is assumed to be in the future. Check if a 32-bit overflow
-		 * occurs between the current time and the target time.
-		 */
-		if (now_us_wrapped > target_time) {
-			/**
-			 * Add a 32-bit overflow and replace the least significant 32 bits
-			 * with the provided target time.
-			 */
-			result = now_us + UINT32_MAX + 1;
-			result &= ~(uint64_t)UINT32_MAX;
-			result |= target_time;
-		} else {
-			/**
-			 * Leave the most significant 32 bits and replace the least significant
-			 * 32 bits with the provided target time.
-			 */
-			result = (now_us & (~(uint64_t)UINT32_MAX)) | target_time;
-		}
-	} else {
-		/**
-		 * Target time is assumed to be in the past. Check if a 32-bit overflow
-		 * occurs between the target time and the current time.
-		 */
-		if (now_us_wrapped > target_time) {
-			/**
-			 * Leave the most significant 32 bits and replace the least significant
-			 * 32 bits with the provided target time.
-			 */
-			result = (now_us & (~(uint64_t)UINT32_MAX)) | target_time;
-		} else {
-			/**
-			 * Subtract a 32-bit overflow and replace the least significant
-			 * 32 bits with the provided target time.
-			 */
-			result = now_us - UINT32_MAX - 1;
-			result &= ~(uint64_t)UINT32_MAX;
-			result |= target_time;
-		}
-	}
-
-	return result;
-}
-
 static void nrf5_receive_at(uint32_t start, uint32_t duration, uint8_t channel, uint32_t id)
 {
 	/*
@@ -1004,7 +1005,9 @@ void nrf_802154_receive_failed(nrf_802154_rx_error_t error, uint32_t id)
 	if ((id == DRX_SLOT_PH) || (id == DRX_SLOT_RX)) {
 		__ASSERT_NO_MSG(nrf5_data.event_handler);
 		nrf5_data.event_handler(dev, IEEE802154_EVENT_SLEEP, NULL);
-		return;
+		if (error == NRF_802154_RX_ERROR_DELAYED_TIMEOUT) {
+			return;
+		}
 	}
 #else
 	ARG_UNUSED(id);
@@ -1029,6 +1032,10 @@ void nrf_802154_receive_failed(nrf_802154_rx_error_t error, uint32_t id)
 	default:
 		reason = IEEE802154_RX_FAIL_OTHER;
 		break;
+	}
+
+	if (IS_ENABLED(CONFIG_IEEE802154_NRF5_LOG_RX_FAILURES)) {
+		LOG_INF("Rx failed, error = %d", error);
 	}
 
 	nrf5_data.last_frame_ack_fpb = false;

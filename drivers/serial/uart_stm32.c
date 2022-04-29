@@ -78,7 +78,7 @@ static void uart_stm32_pm_policy_state_lock_get(const struct device *dev)
 
 	if (!data->pm_policy_state_on) {
 		data->pm_policy_state_on = true;
-		pm_policy_state_lock_get(PM_STATE_SUSPEND_TO_IDLE);
+		pm_policy_state_lock_get(PM_STATE_SUSPEND_TO_IDLE, PM_ALL_SUBSTATES);
 	}
 }
 
@@ -88,7 +88,7 @@ static void uart_stm32_pm_policy_state_lock_put(const struct device *dev)
 
 	if (data->pm_policy_state_on) {
 		data->pm_policy_state_on = false;
-		pm_policy_state_lock_put(PM_STATE_SUSPEND_TO_IDLE);
+		pm_policy_state_lock_put(PM_STATE_SUSPEND_TO_IDLE, PM_ALL_SUBSTATES);
 	}
 }
 #endif /* CONFIG_PM */
@@ -472,6 +472,12 @@ static int uart_stm32_configure(const struct device *dev,
 		uart_stm32_set_baudrate(dev, cfg->baudrate);
 		data->baud_rate = cfg->baudrate;
 	}
+
+#ifdef LL_USART_TXRX_SWAPPED
+	if (config->tx_rx_swap) {
+		LL_USART_SetTXRXSwap(config->usart, LL_USART_TXRX_SWAPPED);
+	}
+#endif
 
 	LL_USART_Enable(config->usart);
 	return 0;
@@ -1715,6 +1721,7 @@ static const struct uart_stm32_config uart_stm32_cfg_##index = {	\
 	.parity = DT_INST_ENUM_IDX_OR(index, parity, UART_CFG_PARITY_NONE),	\
 	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(index),			\
 	.single_wire = DT_INST_PROP_OR(index, single_wire, false), \
+	.tx_rx_swap = DT_INST_PROP_OR(index, tx_rx_swap, false),	\
 	STM32_UART_IRQ_HANDLER_FUNC(index)				\
 };									\
 									\

@@ -15,6 +15,9 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(timer, LOG_LEVEL_ERR);
 
+BUILD_ASSERT(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC == 32768,
+	     "ITE RTOS timer HW frequency is fixed at 32768Hz");
+
 /* Event timer configurations */
 #define EVENT_TIMER		EXT_TIMER_3
 #define EVENT_TIMER_IRQ		DT_INST_IRQ_BY_IDX(0, 0, irq)
@@ -225,7 +228,15 @@ void sys_clock_set_timeout(int32_t ticks, bool idle)
 	IT8XXX2_EXT_CTRLX(EVENT_TIMER) &= ~IT8XXX2_EXT_ETXEN;
 
 	if (ticks == K_TICKS_FOREVER) {
-		/* Return since no future timer interrupts are required */
+		/*
+		 * If kernel doesn't have a timeout:
+		 * 1.CONFIG_SYSTEM_CLOCK_SLOPPY_IDLE = y (no future timer interrupts
+		 *   are expected), kernel pass K_TICKS_FOREVER (0xFFFF FFFF FFFF FFFF),
+		 *   we handle this case in here.
+		 * 2.CONFIG_SYSTEM_CLOCK_SLOPPY_IDLE = n (schedule timeout as far
+		 *   into the future as possible), kernel pass INT_MAX (0x7FFF FFFF),
+		 *   we handle it in later else {}.
+		 */
 		k_spin_unlock(&lock, key);
 		return;
 	} else if (ticks <= 1) {
@@ -237,19 +248,12 @@ void sys_clock_set_timeout(int32_t ticks, bool idle)
 		 */
 		hw_cnt = MAX((1 * HW_CNT_PER_SYS_TICK), 1);
 	} else {
-		if (ticks > EVEN_TIMER_MAX_CNT_SYS_TICK)
-			/*
-			 * Set event timer count to EVENT_TIMER_MAX_CNT, after
-			 * interrupt fired the remaining time will be set again
-			 * by sys_clock_announce().
-			 */
-			hw_cnt = EVENT_TIMER_MAX_CNT;
-		else
-			/*
-			 * Set event timer count to system tick or at least
-			 * 1 hw count
-			 */
-			hw_cnt = MAX((ticks * HW_CNT_PER_SYS_TICK), 1);
+		/*
+		 * Set event timer count to EVENT_TIMER_MAX_CNT, after
+		 * interrupt fired the remaining time will be set again
+		 * by sys_clock_announce().
+		 */
+		hw_cnt = MIN((ticks * HW_CNT_PER_SYS_TICK), EVENT_TIMER_MAX_CNT);
 	}
 
 	/* Set event timer 24-bit count */
@@ -289,7 +293,7 @@ uint32_t sys_clock_elapsed(void)
 uint32_t sys_clock_cycle_get_32(void)
 {
 	/*
-	 * Get free run observer count and transform unit to system tick
+	 * Get free run observer count
 	 *
 	 * NOTE: Timer is counting down from 0xffffffff. In not combined
 	 *       mode, the observer count value is the same as count, so after
@@ -297,8 +301,7 @@ uint32_t sys_clock_cycle_get_32(void)
 	 *       combined mode, the observer count value is the same as NOT
 	 *       count operation.
 	 */
-	uint32_t dticks = (~(IT8XXX2_EXT_CNTOX(FREE_RUN_TIMER)))
-				/ HW_CNT_PER_SYS_TICK;
+	uint32_t dticks = ~(IT8XXX2_EXT_CNTOX(FREE_RUN_TIMER));
 
 	return dticks;
 }

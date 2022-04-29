@@ -16,7 +16,6 @@ OUTPUT_ARCH(xtensa)
 #include <devicetree.h>
 #include <xtensa/config/core-isa.h>
 #include <soc/memory.h>
-#include <autoconf.h>
 #include <linker/sections.h>
 
 #include <linker/linker-defs.h>
@@ -340,7 +339,7 @@ SECTIONS
   .module_init : ALIGN(4)
   {
    _module_init_start = ABSOLUTE(.);
-    *(*.module_init)
+    *(*.initcall)
     _module_init_end = ABSOLUTE(.);
   } >sdram0 :sdram0_phdr
 

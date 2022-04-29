@@ -40,6 +40,22 @@ Deprecated in this release
 ==========================
 
 * :c:func:`nvs_init` is deprecated in favor of utilizing :c:func:`nvs_mount`.
+* The TinyCBOR module has been deprecated in favor of the new zcbor CBOR
+  library, included with Zephyr in this release.
+
+* SPI
+
+  * Deprecated the `gpio_dev`, `gpio_pin` and `gpio_dt_flags` members from
+    spi_cs_control struct in favor of `gpio_dt_spec` gpio.
+
+* PWM
+
+  * The ``pin`` prefix has been removed from all PWM API calls. So for example,
+    ``pwm_pin_set_cycles`` is now ``pwm_set_cycles``. The old API calls are
+    still provided but marked as deprecated.
+  * The PWM period is now always set in nanoseconds, so the ``_nsec`` and
+    ``_usec`` set functions have been deprecated. Other units can be specified
+    using, e.g. ``PWM_USEC()`` macros, which convert down to nanoseconds.
 
 Stable API changes in this release
 ==================================
@@ -161,6 +177,11 @@ Drivers and Sensors
 
 * PWM
 
+  * Added :c:struct:`pwm_dt_spec` and associated helpers, e.g.
+    :c:macro:`PWM_DT_SPEC_GET` or :c:func:`pwm_set_dt`. This addition makes it
+    easier to use the PWM API when the PWM channel, period and flags are taken
+    from a Devicetree PWM cell.
+
 * Sensor
 
 * Serial
@@ -184,6 +205,30 @@ Build and Infrastructure
 
 Libraries / Subsystems
 **********************
+
+* Management
+
+  * Added support for MCUMGR Parameters command, which can be used to obtain
+    MCUMGR parameters; :kconfig:option:`CONFIG_OS_MGMT_MCUMGR_PARAMS` enables
+    the command.
+  * Added mcumgr fs handler for getting file status which returns file size;
+    controlled with :kconfig:option:`CONFIG_FS_MGMT_FILE_STATUS`
+  * Added mcumgr fs handler for getting file hash/checksum, with support for
+    IEEE CRC32 and SHA256, the following Kconfig options have been added to
+    control the addition:
+
+    * :kconfig:option:`CONFIG_FS_MGMT_CHECKSUM_HASH` to enable the command;
+    * :kconfig:option:`CONFIG_FS_MGMT_CHECKSUM_HASH_CHUNK_SIZE` that sets size
+      of buffer (stack memory) used for calculation:
+
+      * :kconfig:option:`CONFIG_FS_MGMT_CHECKSUM_IEEE_CRC32` enables support for
+        IEEE CRC32.
+      * :kconfig:option:`CONFIG_FS_MGMT_HASH_SHA256` enables SHA256 hash support.
+      * When hash/checksum query to mcumgr does not specify a type, then the order
+        of preference (most priority) is CRC32 followed by SHA256.
+
+  * Added mcumgr os hook to allow an application to accept or decline a reset
+    request; :kconfig:option:`CONFIG_OS_MGMT_RESET_HOOK` enables the callback.
 
 HALs
 ****
