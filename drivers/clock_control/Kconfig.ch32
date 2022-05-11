@@ -7,7 +7,7 @@
 
 menuconfig CLOCK_CONTROL_CH32
 	bool "CH32 Reset & Clock Control"
-	depends on SOC_FAMILY_CH32
+	# depends on SOC_FAMILY_CH32
 	help
 	  Enable driver for Reset & Clock Control subsystem found
 	  in CH32 family of MCUs

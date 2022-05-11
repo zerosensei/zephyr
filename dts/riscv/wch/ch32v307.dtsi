@@ -91,7 +91,7 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			flash0: flash@8000000 {
+			flash0: flash@0000000 {
 				compatible = "soc-nv-flash";
 				label = "FALSH_WCH";
 
@@ -101,7 +101,7 @@
 		};
 	
 		rcc: rcc@40021000 {
-			compatible = "wch,ch32v30-rcc";
+			compatible = "wch,ch32-rcc";
 			#clock-cells = <2>;
 			reg = <0x40021000 0x400>;
 		};

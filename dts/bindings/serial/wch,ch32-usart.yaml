@@ -1,7 +1,8 @@
-description: CH32 USART
+description: CH32 UART
 
 compatible: "wch,ch32-usart"
 
+# include: [uart-controller.yaml, pinctrl-device.yaml]
 include: [uart-controller.yaml]
 
 properties:

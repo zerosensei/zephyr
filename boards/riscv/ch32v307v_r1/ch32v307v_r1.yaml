@@ -8,6 +8,7 @@ ram: 64
 flash: 256
 supported:
   - gpio
+  - uart
   # - i2c
   # - spi
   # - pwm

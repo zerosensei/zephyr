@@ -32,10 +32,10 @@
 #endif
 
 
-static uint32_t get_bus_clock(uint32_t clock, uint32_t prescaler)
-{
-	return clock / prescaler;
-}
+// static uint32_t get_bus_clock(uint32_t clock, uint32_t prescaler)
+// {
+// 	return clock / prescaler;
+// }
 
 static inline int ch32_clock_control_on(const struct device *dev, 
 					clock_control_subsys_t sub_system)
@@ -46,15 +46,15 @@ static inline int ch32_clock_control_on(const struct device *dev,
 
 	switch (pclken->bus) {
 	case CH32_CLOCK_BUS_AHB:
-		RCC_AHBPeriphClockCmd(1, pclken->enr);
+		RCC_AHBPeriphClockCmd(pclken->enr, 1);
 		break;
 
 	case CH32_CLOCK_BUS_APB1:
-		RCC_APB1PeriphClockCmd(1, pclken->enr);
+		RCC_APB1PeriphClockCmd(pclken->enr, 1);
 		break;
 
 	case CH32_CLOCK_BUS_APB2:
-		RCC_APB2PeriphClockCmd(1, pclken->enr);
+		RCC_APB2PeriphClockCmd(pclken->enr, 1);
 		break;
 
 	default:
@@ -73,15 +73,15 @@ static inline int ch32_clock_control_off(const struct device *dev,
 
 	switch (pclken->bus) {
 	case CH32_CLOCK_BUS_AHB:
-		RCC_AHBPeriphClockCmd(0, pclken->enr);
+		RCC_AHBPeriphClockCmd(pclken->enr, 0);
 		break;
 
 	case CH32_CLOCK_BUS_APB1:
-		RCC_APB1PeriphClockCmd(0, pclken->enr);
+		RCC_APB1PeriphClockCmd(pclken->enr, 0);
 		break;
 
 	case CH32_CLOCK_BUS_APB2:
-		RCC_APB2PeriphClockCmd(0, pclken->enr);
+		RCC_APB2PeriphClockCmd(pclken->enr, 0);
 		break;
 
 	default:
@@ -91,49 +91,49 @@ static inline int ch32_clock_control_off(const struct device *dev,
 	return 0;
 }
 
-static int ch32_clock_control_get_subsys_rate(const struct device *clock,
-						clock_control_subsys_t sub_system,
-						uint32_t *rate)
-{
-	struct ch32_pclken *pclken = (struct ch32_pclken *)(sub_system);
-	/*
-	 * Get AHB Clock (= SystemCoreClock = SYSCLK/prescaler)
-	 * SystemCoreClock is preferred to CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC
-	 * since it will be updated after clock configuration and hence
-	 * more likely to contain actual clock speed
-	 */
-	uint32_t ahb_clock = SystemCoreClock;
-	uint32_t apb1_clock = get_bus_clock(ahb_clock, CH32_APB1_PRESCALER);
-	uint32_t apb2_clock = get_bus_clock(ahb_clock, CH32_APB2_PRESCALER);
+// static int ch32_clock_control_get_subsys_rate(const struct device *clock,
+// 						clock_control_subsys_t sub_system,
+// 						uint32_t *rate)
+// {
+// 	struct ch32_pclken *pclken = (struct ch32_pclken *)(sub_system);
+// 	/*
+// 	 * Get AHB Clock (= SystemCoreClock = SYSCLK/prescaler)
+// 	 * SystemCoreClock is preferred to CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC
+// 	 * since it will be updated after clock configuration and hence
+// 	 * more likely to contain actual clock speed
+// 	 */
+// 	uint32_t ahb_clock = SystemCoreClock;
+// 	uint32_t apb1_clock = get_bus_clock(ahb_clock, CH32_APB1_PRESCALER);
+// 	uint32_t apb2_clock = get_bus_clock(ahb_clock, CH32_APB2_PRESCALER);
 
-	ARG_UNUSED(clock);
+// 	ARG_UNUSED(clock);
 
-	switch (pclken->bus) {
-	case CH32_CLOCK_BUS_AHB:
-		*rate = ahb_clock;
-		break;
-	case CH32_CLOCK_BUS_APB1:
-		*rate = apb1_clock;
-		break;
+// 	switch (pclken->bus) {
+// 	case CH32_CLOCK_BUS_AHB:
+// 		*rate = ahb_clock;
+// 		break;
+// 	case CH32_CLOCK_BUS_APB1:
+// 		*rate = apb1_clock;
+// 		break;
 
-	case CH32_CLOCK_BUS_APB2:
-		*rate = apb2_clock;
-		break;
+// 	case CH32_CLOCK_BUS_APB2:
+// 		*rate = apb2_clock;
+// 		break;
 
-	default:
-		return -ENOTSUP;
-	}
+// 	default:
+// 		return -ENOTSUP;
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
 
 static struct clock_control_driver_api ch32_clock_control_api = {
 	.on = ch32_clock_control_on,
 	.off = ch32_clock_control_off,
-	.get_rate = ch32_clock_control_get_subsys_rate,
+	// .get_rate = ch32_clock_control_get_subsys_rate,
 };
 
-static inline void stm32_clock_control_mco_init(void)
+static inline void ch32_clock_control_mco_init(void)
 {
 #ifndef CONFIG_CLOCK_CH32_MCO_SRC_NOCLOCK
 	RCC_MCOConfig(MCO_SOURCE);

@@ -7,14 +7,18 @@
 #define DT_DRV_COMPAT wch_ch32_gpio
 
 #include <drivers/gpio.h>
-#include <drivers/clock_control.h>
-#include <dt-bindings/gpio.h>
+#include <drivers/clock_control/ch32_clock_control.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/ch32-pinctrl.h>
 #include "gpio_utils.h"
 #include <ch32v30x.h>
 
 struct gpio_ch32_data {
 	/* gpio_driver_data needs to be first */
 	struct gpio_driver_data common;
+
+	const struct device *dev;
+
 	sys_slist_t callbacks;
 };
 
@@ -82,19 +86,19 @@ static inline uint32_t ch32_pinval_get(int pin)
 static int gpio_ch32_pin_configure(const struct device *port, gpio_pin_t pin, 
 					gpio_flags_t flags)
 {
-	const struct gpio_ch32_cfg *cfg = prot->config;
+	const struct gpio_ch32_cfg *cfg = port->config;
 	GPIO_TypeDef *gpio = (GPIO_TypeDef *)cfg->base;
-	int pincfg;
+	int pincfg = GPIO_Mode_AIN;
 
 	gpio_ch32_flags_to_conf(flags, &pincfg);
 
 	/* enable clock */
-	if(clock_control_on(port, 
-			(clock_control_subsys_t *)&cfg->pclken)) != 0) {
+	if(clock_control_on(port,  
+			(clock_control_subsys_t *)&cfg->pclken) != 0) {
 		return -EIO; 
 	}
 
-	if(flags & GIPO_OUTPUT) {
+	if(flags & GPIO_OUTPUT) {
 		if(flags & GPIO_OUTPUT_INIT_HIGH) {
 			// gpio_stm32_port_set_bits_raw(dev, BIT(pin));
 		} else if(flags & GPIO_OUTPUT_INIT_LOW) {
@@ -189,8 +193,18 @@ static const struct gpio_driver_api gpio_ch32_driver = {
 static int gpio_ch32_init(const struct device *dev)
 {
 	int ret;
+	struct gpio_ch32_data *data = dev->data;
+	const struct gpio_ch32_cfg *cfg = dev->config;
 
-	return clock_control_on(port, (clock_control_subsys_t *)&cfg->pclken)) != 0);
+	data->dev = dev;
+
+	const struct device *clk = DEVICE_DT_GET(CH32_CLOCK_CONTROL_NODE);
+
+	ret = clock_control_on(clk,
+				(clock_control_subsys_t *)&cfg->pclken);
+
+	return ret;
+
 }
 
 #define GPIO_DEVICE_INIT(__node, __suffix, __base_addr, __port, __cenr, __bus) \
@@ -203,10 +217,10 @@ static int gpio_ch32_init(const struct device *dev)
 		.pclken = { .bus = __bus, .enr = __cenr }		       \
 	};								       \
 	static struct gpio_ch32_data gpio_ch32_data_## __suffix;	       \
-	PM_DEVICE_DT_DEFINE(__node, gpio_stm32_pm_action);		       \
+		       \
 	DEVICE_DT_DEFINE(__node,					       \
-			    gpio_stm32_init,				       \
-			    PM_DEVICE_DT_GET(__node),			       \
+			    gpio_ch32_init,				       \
+			    NULL,			       \
 			    &gpio_ch32_data_## __suffix,		       \
 			    &gpio_ch32_cfg_## __suffix,		       \
 			    PRE_KERNEL_1,				       \
@@ -221,23 +235,23 @@ static int gpio_ch32_init(const struct device *dev)
 			 DT_CLOCKS_CELL(DT_NODELABEL(gpio##__suffix), bits),\
 			 DT_CLOCKS_CELL(DT_NODELABEL(gpio##__suffix), bus))
 
-// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay)
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay)
 GPIO_DEVICE_INIT_CH32(a, A);
-// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay) */
+#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioa), okay) */
 
-// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay)
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay)
 GPIO_DEVICE_INIT_CH32(b, B);
-// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay) */
+#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiob), okay) */
 
-// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay)
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay)
 GPIO_DEVICE_INIT_CH32(c, C);
-// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay) */
+#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioc), okay) */
 
-// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay)
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay)
 GPIO_DEVICE_INIT_CH32(d, D);
-// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay) */
+#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpiod), okay) */
 
-// #if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay)
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay)
 GPIO_DEVICE_INIT_CH32(e, E);
-// #endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay) */
+#endif /* DT_NODE_HAS_STATUS(DT_NODELABEL(gpioe), okay) */
 

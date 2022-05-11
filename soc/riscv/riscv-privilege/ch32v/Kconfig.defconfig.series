@@ -8,4 +8,17 @@ source "soc/riscv/riscv-privilege/ch32v/Kconfig.defconfig.ch32v*"
 config SOC_SERIES
 	default "ch32v"
 
+config CLOCK_CONTROL
+	default y
+
+config UART_CH32
+	default y
+	depends on SERIAL
+
+if GPIO
+config GPIO_CH32
+	default y
+
+endif # GPIO
+
 endif # SOC_SERIES_CH32V
