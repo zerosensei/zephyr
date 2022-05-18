@@ -8,7 +8,7 @@
 
  / {
 	 soc {
-		 pinctrl: pin-controller@40020000 {
+		 pinctrl: pin-controller@40010800 {
  
 			 /* ADC_IN / ADC_INN / ADC_INP */
  
