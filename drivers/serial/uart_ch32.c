@@ -10,6 +10,7 @@
 #include <drivers/pinctrl.h>
 #include <drivers/uart.h>
 #include <soc.h>
+#include <ch32v30x.h>
 
 struct usart_ch32_config {
 	/* USART instance */

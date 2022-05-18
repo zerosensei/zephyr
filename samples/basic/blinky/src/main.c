@@ -73,14 +73,14 @@ void debug_init(void)
 }
 
 
-void putchar(const char ch)
+void put_char(const char ch)
 {
 	USART_SendData(USART1, ch);
 }
 
 void printch(const char ch)   //输出字符
 {  
-    putchar(ch);  
+    put_char(ch);  
 }  
  
  
@@ -91,7 +91,7 @@ void printint(const int dec)     //输出整型数
         return;  
     }  
     printint(dec / 10);  
-    putchar((char)(dec % 10 + '0'));  
+    put_char((char)(dec % 10 + '0'));  
 }  
  
  
@@ -99,7 +99,7 @@ void printstr(const char *ptr)        //输出字符串
 {  
     while(*ptr)  
     {  
-        putchar(*ptr);  
+        put_char(*ptr);  
         ptr++;  
     }  
 }  
@@ -113,7 +113,7 @@ void my_printf(const char *format,...)
     {  
         if(*format != '%')  
         {  
-            putchar(*format);  
+            put_char(*format);  
             format++;  
         }  
         else  

@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define DT_DRV_COMPAT wch_ch32_pinctrl
+
 #include <errno.h>
 #include <drivers/clock_control/ch32_clock_control.h>
 #include <drivers/pinctrl.h>
+#include <pinmux/pinmux_ch32.h>
 
 /**
  * @brief Array containing pointers to each GPIO port.
