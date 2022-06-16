@@ -89,6 +89,7 @@ beacon	Compass Electronics Group, LLC
 beagle	BeagleBoard.org Foundation
 bhf	Beckhoff Automation GmbH & Co. KG
 bitmain	Bitmain Technologies
+blues	Blues Wireless
 blutek	BluTek Power
 boe	BOE Technology Group Co., Ltd.
 bosch	Bosch Sensortec GmbH
@@ -258,6 +259,7 @@ hugsun	Shenzhen Hugsun Technology Co. Ltd.
 hwacom	HwaCom Systems Inc.
 hycon	Hycon Technology Corp.
 hydis	Hydis Technologies
+hynitron	Hynitron
 hyundai	Hyundai Technology
 i2se	I2SE GmbH
 ibm	International Business Machines (IBM)
@@ -480,6 +482,7 @@ qi	Qi Hardware
 qihua	Chengdu Kaixuan Information Technology Co., Ltd.
 qiaodian	QiaoDian XianShi Corporation
 qnap	QNAP Systems, Inc.
+qorvo	Qorvo, Inc.
 quectel	Quectel Wireless Solutions Co., Ltd.
 quicklogic	QuickLogic Corp.
 radxa	Radxa
@@ -662,6 +665,7 @@ wobo	Wobo
 wolfson	Cirrus Logic, Inc. (formerly Wolfson Microelectronics plc)
 worldsemi	Worldsemi Co., Limited
 x-powers	X-Powers
+xen	Xen Hypervisor
 xes	Extreme Engineering Solutions (X-ES)
 xiaomi	Xiaomi Technology Co., Ltd.
 xillybus	Xillybus Ltd.

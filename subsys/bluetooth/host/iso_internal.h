@@ -4,14 +4,14 @@
 
 /*
  * Copyright (c) 2020 Intel Corporation
- * Copyright (c) 2021 Nordic Semiconductor ASA
+ * Copyright (c) 2021-2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <bluetooth/iso.h>
+#include <zephyr/bluetooth/iso.h>
 
-#define BT_ISO_DATA_PATH_DISABLED			0xFF
+#define BT_ISO_MAX_SEQ_NUM 0xFFFF
 
 struct iso_data {
 	/** BT_BUF_ISO_IN */
@@ -108,6 +108,9 @@ void bt_iso_connected(struct bt_conn *iso);
 /* Notify ISO channels of a disconnect event */
 void bt_iso_disconnected(struct bt_conn *iso);
 
+/* Notify ISO connected channels of security changed */
+void bt_iso_security_changed(struct bt_conn *acl, uint8_t hci_status);
+
 /* Allocate ISO PDU */
 #if defined(CONFIG_NET_BUF_LOG)
 struct net_buf *bt_iso_create_pdu_timeout_debug(struct net_buf_pool *pool,
@@ -150,12 +153,13 @@ struct net_buf *bt_iso_create_frag_timeout(size_t reserve, k_timeout_t timeout);
 #endif
 
 #if defined(CONFIG_BT_DEBUG_ISO)
-void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan, uint8_t state,
+void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan,
+				 enum bt_iso_state state,
 				 const char *func, int line);
 #define bt_iso_chan_set_state(_chan, _state) \
 	bt_iso_chan_set_state_debug(_chan, _state, __func__, __LINE__)
 #else
-void bt_iso_chan_set_state(struct bt_iso_chan *chan, uint8_t state);
+void bt_iso_chan_set_state(struct bt_iso_chan *chan, enum bt_iso_state state);
 #endif /* CONFIG_BT_DEBUG_ISO */
 
 /* Process incoming data for a connection */

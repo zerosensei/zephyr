@@ -3,22 +3,24 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <logging/log_msg.h>
+#include <zephyr/logging/log_msg.h>
 #include "log_list.h"
-#include <logging/log.h>
-#include <logging/log_backend.h>
-#include <logging/log_ctrl.h>
-#include <logging/log_output.h>
-#include <logging/log_internal.h>
-#include <sys/mpsc_pbuf.h>
-#include <sys/printk.h>
-#include <sys_clock.h>
-#include <init.h>
-#include <sys/__assert.h>
-#include <sys/atomic.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_backend.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/logging/log_output.h>
+#include <zephyr/logging/log_internal.h>
+#include <zephyr/sys/mpsc_pbuf.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys_clock.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/sys/atomic.h>
 #include <ctype.h>
-#include <logging/log_frontend.h>
-#include <syscall_handler.h>
+#include <zephyr/logging/log_frontend.h>
+#include <zephyr/syscall_handler.h>
+#include <zephyr/logging/log_output_dict.h>
+#include <zephyr/linker/utils.h>
 
 LOG_MODULE_REGISTER(log);
 
@@ -56,6 +58,37 @@ LOG_MODULE_REGISTER(log);
 
 #ifndef CONFIG_LOG_BUFFER_SIZE
 #define CONFIG_LOG_BUFFER_SIZE 4
+#endif
+
+#ifndef CONFIG_LOG_TAG_MAX_LEN
+#define CONFIG_LOG_TAG_MAX_LEN 0
+#endif
+
+#ifndef CONFIG_LOG2_ALWAYS_RUNTIME
+BUILD_ASSERT(!IS_ENABLED(CONFIG_NO_OPTIMIZATIONS),
+	     "Option must be enabled when CONFIG_NO_OPTIMIZATIONS is set");
+BUILD_ASSERT(!IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE),
+	     "Option must be enabled when CONFIG_LOG_MODE_IMMEDIATE is set");
+#endif
+
+#ifndef CONFIG_LOG1
+static const log_format_func_t format_table[] = {
+	[LOG_OUTPUT_TEXT] = log_output_msg2_process,
+	[LOG_OUTPUT_SYST] = IS_ENABLED(CONFIG_LOG_MIPI_SYST_ENABLE) ?
+						log_output_msg2_syst_process : NULL,
+	[LOG_OUTPUT_DICT] = IS_ENABLED(CONFIG_LOG_DICTIONARY_SUPPORT) ?
+						log_dict_output_msg2_process : NULL
+};
+
+log_format_func_t log_format_func_t_get(uint32_t log_type)
+{
+	return format_table[log_type];
+}
+
+size_t log_format_table_size(void)
+{
+	return ARRAY_SIZE(format_table);
+}
 #endif
 
 struct log_strdup_buf {
@@ -105,8 +138,10 @@ static const struct mpsc_pbuf_buffer_config mpsc_config = {
 	.size = ARRAY_SIZE(buf32),
 	.notify_drop = notify_drop,
 	.get_wlen = log_msg2_generic_get_wlen,
-	.flags = IS_ENABLED(CONFIG_LOG_MODE_OVERFLOW) ?
-		MPSC_PBUF_MODE_OVERWRITE : 0
+	.flags = (IS_ENABLED(CONFIG_LOG_MODE_OVERFLOW) ?
+		  MPSC_PBUF_MODE_OVERWRITE : 0) |
+		 (IS_ENABLED(CONFIG_LOG_MEM_UTILIZATION) ?
+		  MPSC_PBUF_MAX_UTILIZATION : 0)
 };
 
 /* Check that default tag can fit in tag buffer. */
@@ -123,6 +158,11 @@ static void msg_process(union log_msgs msg, bool bypass);
 static log_timestamp_t dummy_timestamp(void)
 {
 	return 0;
+}
+
+log_timestamp_t z_log_timestamp(void)
+{
+	return timestamp_func();
 }
 
 uint32_t z_log_get_s_mask(const char *str, uint32_t nargs)
@@ -152,36 +192,6 @@ uint32_t z_log_get_s_mask(const char *str, uint32_t nargs)
 }
 
 /**
- * @brief Check if address is in read only section.
- *
- * @param addr Address.
- *
- * @return True if address identified within read only section.
- */
-static bool is_rodata(const void *addr)
-{
-#if defined(CONFIG_ARM) || defined(CONFIG_ARC) || defined(CONFIG_X86) || \
-	defined(CONFIG_ARM64) || defined(CONFIG_NIOS2) || \
-	defined(CONFIG_RISCV) || defined(CONFIG_SPARC) || defined(CONFIG_MIPS)
-	extern const char *__rodata_region_start[];
-	extern const char *__rodata_region_end[];
-	#define RO_START __rodata_region_start
-	#define RO_END __rodata_region_end
-#elif defined(CONFIG_XTENSA)
-	extern const char *_rodata_start[];
-	extern const char *_rodata_end[];
-	#define RO_START _rodata_start
-	#define RO_END _rodata_end
-#else
-	#define RO_START 0
-	#define RO_END 0
-#endif
-
-	return (((const char *)addr >= (const char *)RO_START) &&
-		((const char *)addr < (const char *)RO_END));
-}
-
-/**
  * @brief Scan string arguments and report every address which is not in read
  *	  only memory and not yet duplicated.
  *
@@ -206,7 +216,7 @@ static void detect_missed_strdup(struct log_msg *msg)
 	while (mask) {
 		idx = 31 - __builtin_clz(mask);
 		str = (const char *)log_msg_arg_get(msg, idx);
-		if (!is_rodata(str) && !log_is_strdup(str) &&
+		if (!linker_is_in_rodata(str) && !log_is_strdup(str) &&
 			(str != log_strdup_fail_msg)) {
 			const char *src_name =
 				log_source_name_get(CONFIG_LOG_DOMAIN_ID,
@@ -269,6 +279,10 @@ static inline void msg_finalize(struct log_msg *msg,
 
 void log_0(const char *str, struct log_msg_ids src_level)
 {
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_0(str, src_level);
 	} else {
@@ -285,6 +299,10 @@ void log_1(const char *str,
 	   log_arg_t arg0,
 	   struct log_msg_ids src_level)
 {
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_1(str, arg0, src_level);
 	} else {
@@ -302,6 +320,10 @@ void log_2(const char *str,
 	   log_arg_t arg1,
 	   struct log_msg_ids src_level)
 {
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_2(str, arg0, arg1, src_level);
 	} else {
@@ -321,6 +343,10 @@ void log_3(const char *str,
 	   log_arg_t arg2,
 	   struct log_msg_ids src_level)
 {
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_3(str, arg0, arg1, arg2, src_level);
 	} else {
@@ -339,6 +365,10 @@ void log_n(const char *str,
 	   uint32_t narg,
 	   struct log_msg_ids src_level)
 {
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_n(str, args, narg, src_level);
 	} else {
@@ -352,9 +382,33 @@ void log_n(const char *str,
 	}
 }
 
+#ifndef CONFIG_LOG1
+const struct log_backend *log_format_set_all_active_backends(size_t log_type)
+{
+	const struct log_backend *backend;
+	const struct log_backend *failed_backend = NULL;
+
+	for (int i = 0; i < log_backend_count_get(); i++) {
+		backend = log_backend_get(i);
+		if (log_backend_is_active(backend)) {
+			int retCode = log_backend_format_set(backend, log_type);
+
+			if (retCode != 0) {
+				failed_backend = backend;
+			}
+		}
+	}
+	return failed_backend;
+}
+#endif
+
 void log_hexdump(const char *str, const void *data, uint32_t length,
 		 struct log_msg_ids src_level)
 {
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		return;
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_hexdump(str, (const uint8_t *)data, length,
 				     src_level);
@@ -370,42 +424,51 @@ void log_hexdump(const char *str, const void *data, uint32_t length,
 	}
 }
 
-void z_log_printk(const char *fmt, va_list ap)
+void z_log_vprintk(const char *fmt, va_list ap)
 {
-	if (IS_ENABLED(CONFIG_LOG_PRINTK)) {
-		union {
-			struct log_msg_ids structure;
-			uint32_t value;
-		} src_level_union = {
-			{
-				.level = LOG_LEVEL_INTERNAL_RAW_STRING
-			}
-		};
+	if (!IS_ENABLED(CONFIG_LOG_PRINTK)) {
+		return;
+	}
 
-		if (k_is_user_context()) {
-			uint8_t str[CONFIG_LOG_PRINTK_MAX_STRING_LENGTH + 1];
+	if (!IS_ENABLED(CONFIG_LOG1)) {
+		z_log_msg2_runtime_vcreate(CONFIG_LOG_DOMAIN_ID, NULL,
+					   LOG_LEVEL_INTERNAL_RAW_STRING, NULL, 0, 0,
+					   fmt, ap);
+		return;
+	}
 
-			vsnprintk(str, sizeof(str), fmt, ap);
-
-			z_log_string_from_user(src_level_union.value, str);
-		} else if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
-			log_generic(src_level_union.structure, fmt, ap,
-							LOG_STRDUP_SKIP);
-		} else {
-			uint8_t str[CONFIG_LOG_PRINTK_MAX_STRING_LENGTH + 1];
-			struct log_msg *msg;
-			int length;
-
-			length = vsnprintk(str, sizeof(str), fmt, ap);
-			length = MIN(length, sizeof(str));
-
-			msg = log_msg_hexdump_create(NULL, str, length);
-			if (msg == NULL) {
-				return;
-			}
-
-			msg_finalize(msg, src_level_union.structure);
+	union {
+		struct log_msg_ids structure;
+		uint32_t value;
+	} src_level_union = {
+		{
+			.level = LOG_LEVEL_INTERNAL_RAW_STRING
 		}
+	};
+
+	if (k_is_user_context()) {
+		uint8_t str[CONFIG_LOG_PRINTK_MAX_STRING_LENGTH + 1];
+
+		vsnprintk(str, sizeof(str), fmt, ap);
+
+		z_log_string_from_user(src_level_union.value, str);
+	} else if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
+		log_generic(src_level_union.structure, fmt, ap,
+						LOG_STRDUP_SKIP);
+	} else {
+		uint8_t str[CONFIG_LOG_PRINTK_MAX_STRING_LENGTH + 1];
+		struct log_msg *msg;
+		int length;
+
+		length = vsnprintk(str, sizeof(str), fmt, ap);
+		length = MIN(length, sizeof(str));
+
+		msg = log_msg_hexdump_create(NULL, str, length);
+		if (msg == NULL) {
+			return;
+		}
+
+		msg_finalize(msg, src_level_union.structure);
 	}
 }
 
@@ -477,7 +540,7 @@ void log_generic(struct log_msg_ids src_level, const char *fmt, va_list ap,
 				uint32_t idx = 31 - __builtin_clz(mask);
 				const char *str = (const char *)args[idx];
 
-				/* is_rodata(str) is not checked,
+				/* linker_is_in_rodata(str) is not checked,
 				 * because log_strdup does it.
 				 * Hence, we will do only optional check
 				 * if already not duplicated.
@@ -577,19 +640,41 @@ void log_core_init(void)
 	if (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) {
 		z_log_runtime_filters_init();
 	}
-}
-
-void log_init(void)
-{
-	__ASSERT_NO_MSG(log_backend_count_get() < LOG_FILTERS_NUM_OF_SLOTS);
-	int i;
 
 	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
 		log_frontend_init();
 	}
+}
+
+static uint32_t activate_foreach_backend(uint32_t mask)
+{
+	uint32_t mask_cpy = mask;
+
+	while (mask_cpy) {
+		uint32_t i = __builtin_ctz(mask_cpy);
+		const struct log_backend *backend = log_backend_get(i);
+
+		mask_cpy &= ~BIT(i);
+		if (log_backend_is_ready(backend) == 0) {
+			mask &= ~BIT(i);
+			log_backend_enable(backend,
+					   backend->cb->ctx,
+					   CONFIG_LOG_MAX_LEVEL);
+		}
+	}
+
+	return mask;
+}
+
+static uint32_t z_log_init(bool blocking, bool can_sleep)
+{
+	uint32_t mask = 0;
+
+	__ASSERT_NO_MSG(log_backend_count_get() < LOG_FILTERS_NUM_OF_SLOTS);
+	int i;
 
 	if (atomic_inc(&initialized) != 0) {
-		return;
+		return 0;
 	}
 
 	/* Assign ids to backends. */
@@ -597,15 +682,37 @@ void log_init(void)
 		const struct log_backend *backend = log_backend_get(i);
 
 		if (backend->autostart) {
-			if (backend->api->init != NULL) {
-				backend->api->init(backend);
-			}
+			log_backend_init(backend);
 
-			log_backend_enable(backend,
-					   backend->cb->ctx,
-					   CONFIG_LOG_MAX_LEVEL);
+			/* If backend has activation function then backend is
+			 * not ready until activated.
+			 */
+			if (log_backend_is_ready(backend) == 0) {
+				log_backend_enable(backend,
+						   backend->cb->ctx,
+						   CONFIG_LOG_MAX_LEVEL);
+			} else {
+				mask |= BIT(i);
+			}
 		}
 	}
+
+	/* If blocking init, wait until all backends are activated. */
+	if (blocking) {
+		while (mask) {
+			mask = activate_foreach_backend(mask);
+			if (IS_ENABLED(CONFIG_MULTITHREADING) && can_sleep) {
+				k_msleep(10);
+			}
+		}
+	}
+
+	return mask;
+}
+
+void log_init(void)
+{
+	(void)z_log_init(true, true);
 }
 
 static void thread_set(k_tid_t process_tid)
@@ -655,7 +762,11 @@ void z_impl_log_panic(void)
 	/* If panic happened early logger might not be initialized.
 	 * Forcing initialization of the logger and auto-starting backends.
 	 */
-	log_init();
+	(void)z_log_init(true, false);
+
+	if (IS_ENABLED(CONFIG_LOG_FRONTEND)) {
+		log_frontend_panic();
+	}
 
 	for (int i = 0; i < log_backend_count_get(); i++) {
 		backend = log_backend_get(i);
@@ -881,7 +992,7 @@ char *z_log_strdup(const char *str)
 	int err;
 
 	if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE) ||
-	    is_rodata(str) || k_is_user_context()) {
+	    linker_is_in_rodata(str) || k_is_user_context()) {
 		return (char *)str;
 	}
 
@@ -1228,10 +1339,7 @@ const char *z_log_get_tag(void)
 
 int log_set_tag(const char *str)
 {
-	if (CONFIG_LOG_TAG_MAX_LEN == 0) {
-		return -ENOTSUP;
-	}
-
+#if CONFIG_LOG_TAG_MAX_LEN > 0
 	if (str == NULL) {
 		return -EINVAL;
 	}
@@ -1248,6 +1356,45 @@ int log_set_tag(const char *str)
 	}
 
 	return 0;
+#else
+	return -ENOTSUP;
+#endif
+}
+
+int log_mem_get_usage(uint32_t *buf_size, uint32_t *usage)
+{
+	__ASSERT_NO_MSG(buf_size != NULL);
+	__ASSERT_NO_MSG(usage != NULL);
+
+	if (!IS_ENABLED(CONFIG_LOG_MODE_DEFERRED)) {
+		return -EINVAL;
+	}
+
+	if (IS_ENABLED(CONFIG_LOG1)) {
+		*buf_size = CONFIG_LOG_BUFFER_SIZE;
+		*usage = log_msg_mem_get_used() * log_msg_get_slab_size();
+		return 0;
+	}
+
+	mpsc_pbuf_get_utilization(&log_buffer, buf_size, usage);
+
+	return 0;
+}
+
+int log_mem_get_max_usage(uint32_t *max)
+{
+	__ASSERT_NO_MSG(max != NULL);
+
+	if (!IS_ENABLED(CONFIG_LOG_MODE_DEFERRED)) {
+		return -EINVAL;
+	}
+
+	if (IS_ENABLED(CONFIG_LOG1)) {
+		*max = log_msg_mem_get_max_used() * log_msg_get_slab_size();
+		return 0;
+	}
+
+	return mpsc_pbuf_get_max_utilization(&log_buffer, max);
 }
 
 static void log_process_thread_timer_expiry_fn(struct k_timer *timer)
@@ -1259,12 +1406,24 @@ static void log_process_thread_func(void *dummy1, void *dummy2, void *dummy3)
 {
 	__ASSERT_NO_MSG(log_backend_count_get() > 0);
 
-	log_init();
+	uint32_t activate_mask = z_log_init(false, false);
+	k_timeout_t timeout = K_MSEC(50); /* Arbitrary value */
+
 	thread_set(k_current_get());
 
+	/* Logging thread is periodically waken up until all backends that
+	 * should be autostarted are ready.
+	 */
 	while (true) {
+		if (activate_mask) {
+			activate_mask = activate_foreach_backend(activate_mask);
+			if (!activate_mask) {
+				timeout = K_FOREVER;
+			}
+		}
+
 		if (log_process(false) == false) {
-			k_sem_take(&log_process_thread_sem, K_FOREVER);
+			(void)k_sem_take(&log_process_thread_sem, timeout);
 		}
 	}
 }
@@ -1289,7 +1448,7 @@ static int enable_logger(const struct device *arg)
 					K_NO_WAIT));
 		k_thread_name_set(&logging_thread, "logging");
 	} else {
-		log_init();
+		(void)z_log_init(false, false);
 	}
 
 	return 0;

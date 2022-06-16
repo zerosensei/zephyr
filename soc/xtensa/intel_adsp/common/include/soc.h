@@ -8,7 +8,7 @@
 
 #include <string.h>
 #include <errno.h>
-#include <arch/xtensa/cache.h>
+#include <zephyr/arch/xtensa/cache.h>
 
 /* macros related to interrupt handling */
 #define XTENSA_IRQ_NUM_SHIFT			0
@@ -44,15 +44,6 @@
 #define IOAPIC_EDGE				0
 #define IOAPIC_HIGH				0
 
-/* I2S */
-#define I2S_CAVS_IRQ(i2s_num)			\
-	SOC_AGGREGATE_IRQ(0, (i2s_num), CAVS_L2_AGG_INT_LEVEL5)
-
-#define I2S0_CAVS_IRQ				I2S_CAVS_IRQ(0)
-#define I2S1_CAVS_IRQ				I2S_CAVS_IRQ(1)
-#define I2S2_CAVS_IRQ				I2S_CAVS_IRQ(2)
-#define I2S3_CAVS_IRQ				I2S_CAVS_IRQ(3)
-
 #define SSP_MN_DIV_SIZE				(8)
 #define SSP_MN_DIV_BASE(x)			\
 	(0x00078D00 + ((x) * SSP_MN_DIV_SIZE))
@@ -70,7 +61,17 @@
 #define __imr __in_section_unique(imr)
 #define __imrdata __in_section_unique(imrdata)
 
+extern char _text_start[];
+extern char _text_end[];
+extern char _imr_start[];
+extern char _imr_end[];
+extern char _end[];
+extern char _heap_sentry[];
+extern char _cached_start[];
+extern char _cached_end[];
+
 extern void soc_trace_init(void);
+extern void z_soc_irq_init(void);
 extern void z_soc_irq_enable(uint32_t irq);
 extern void z_soc_irq_disable(uint32_t irq);
 extern int z_soc_irq_is_enabled(unsigned int irq);
@@ -88,5 +89,41 @@ extern bool soc_cpus_active[CONFIG_MP_NUM_CPUS];
 	z_xtensa_cache_inv((addr), (size))
 #define z_soc_cached_ptr(p) arch_xtensa_cached_ptr(p)
 #define z_soc_uncached_ptr(p) arch_xtensa_uncached_ptr(p)
+
+/**
+ * @brief Halts and offlines a running CPU
+ *
+ * Enables power gating on the specified CPU, which cannot be the
+ * current CPU or CPU 0.  The CPU must be idle; no application threads
+ * may be runnable on it when this function is called (or at least the
+ * CPU must be guaranteed to reach idle in finite time without
+ * deadlock).  Actual CPU shutdown can only happen in the context of
+ * the idle thread, and synchronization is an application
+ * responsibility.  This function will hang if the other CPU fails to
+ * reach idle.
+ *
+ * @note On older cAVS hardware, core power is controlled by the host.
+ * This function must still be called for OS bookkeeping, but it is
+ * insufficient without application coordination (and careful
+ * synchronization!) with the host x86 environment.
+ *
+ * @param id CPU to halt, not current cpu or cpu 0
+ * @return 0 on success, -EINVAL on error
+ */
+int soc_adsp_halt_cpu(int id);
+
+static inline bool intel_adsp_ptr_executable(const void *p)
+{
+	return (p >= (void *)_text_start && p <= (void *)_text_end) ||
+		(p >= (void *)_imr_start && p <= (void *)_imr_end);
+}
+
+static inline bool intel_adsp_ptr_is_sane(uint32_t sp)
+{
+	return ((char *)sp >= _end && (char *)sp <= _heap_sentry) ||
+		((char *)sp >= _cached_start && (char *)sp <= _cached_end) ||
+		(sp >= (CONFIG_IMR_MANIFEST_ADDR - CONFIG_ISR_STACK_SIZE)
+		 && sp <= CONFIG_IMR_MANIFEST_ADDR);
+}
 
 #endif /* __INC_SOC_H */

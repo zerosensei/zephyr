@@ -4,15 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <init.h>
+#include <zephyr/init.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <mipi_syst.h>
-#include <sys/__assert.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
-#include <logging/log_output.h>
+#include <zephyr/spinlock.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/sys/check.h>
+#include <zephyr/linker/utils.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/logging/log_output.h>
 
 static struct mipi_syst_header log_syst_header;
 static struct mipi_syst_handle log_syst_handle;
@@ -417,6 +420,29 @@ static void update_systh_platform_data(struct mipi_syst_handle *handle,
 #endif
 }
 
+#if defined(CONFIG_LOG1) || defined(CONFIG_LOG_MIPI_SYST_OUTPUT_LOG_MSG_SRC_ID)
+/**
+ * @brief Set module ID in the origin unit of Sys-T message
+ *
+ * Note that this only sets the module ID if
+ * CONFIG_LOG_MIPI_SYST_OUTPUT_LOG_MSG_SRC_ID is enabled.
+ * Otherwise, this is a no-op as the module ID is set to
+ * default at boot time, and no need to be set again.
+ *
+ * @param handle Pointer to mipi_syst_handle struct
+ * @param module_id Module ID to be set (range 0x00 - 0x7F)
+ */
+static void update_handle_origin_unit(struct mipi_syst_handle *handle,
+				      int16_t module_id)
+{
+	handle->systh_tag.et_modunit =
+		_MIPI_SYST_MK_MODUNIT_ORIGIN(
+			module_id,
+			CONFIG_LOG_MIPI_SYST_MSG_DEFAULT_UNIT_ID
+		);
+}
+#endif
+
 #if defined(MIPI_SYST_PCFG_ENABLE_PLATFORM_HANDLE_DATA)
 /*
  * Platform specific SyS-T handle initialization hook function
@@ -714,6 +740,12 @@ void log_output_msg_syst_process(const struct log_output *log_output,
 
 	update_systh_platform_data(&log_syst_handle, log_output, flag);
 
+#ifdef CONFIG_LOG_MIPI_SYST_OUTPUT_LOG_MSG_SRC_ID
+	int16_t source_id = (int16_t)log_msg_source_id_get(msg);
+
+	update_handle_origin_unit(&log_syst_handle, source_id);
+#endif
+
 	if (log_msg_is_std(msg)) {
 		std_print(msg, log_output);
 	} else if (raw_string) {
@@ -725,29 +757,27 @@ void log_output_msg_syst_process(const struct log_output *log_output,
 
 void log_output_string_syst_process(const struct log_output *log_output,
 				struct log_msg_ids src_level,
-				const char *fmt, va_list ap, uint32_t flag)
+				const char *fmt, va_list ap, uint32_t flag,
+				int16_t source_id)
 {
-	uint8_t str[STRING_BUF_MAX_LEN + 1];
-	size_t length = STRING_BUF_MAX_LEN;
 	uint32_t severity = level_to_syst_severity((uint32_t)src_level.level);
 
-	length = vsnprintk(str, length, fmt, ap);
-	str[length] = '\0';
-
 	update_systh_platform_data(&log_syst_handle, log_output, flag);
+	update_handle_origin_unit(&log_syst_handle, source_id);
 
-	MIPI_SYST_PRINTF(&log_syst_handle, severity, str);
+	MIPI_SYST_VPRINTF(&log_syst_handle, severity, fmt, ap);
 }
 
 void log_output_hexdump_syst_process(const struct log_output *log_output,
 				     struct log_msg_ids src_level,
 				     const char *metadata,
 				     const uint8_t *data, uint32_t length,
-				     uint32_t flag)
+				     uint32_t flag, int16_t source_id)
 {
 	uint32_t severity = level_to_syst_severity((uint32_t)src_level.level);
 
 	update_systh_platform_data(&log_syst_handle, log_output, flag);
+	update_handle_origin_unit(&log_syst_handle, source_id);
 
 	MIPI_SYST_PRINTF(&log_syst_handle, severity, "%s", metadata);
 
@@ -761,7 +791,7 @@ void log_output_hexdump_syst_process(const struct log_output *log_output,
 	}
 }
 
-#else
+#else /* !CONFIG_LOG2 */
 static void hexdump2_print(const uint8_t *data, uint32_t length,
 			   uint32_t severity)
 {
@@ -775,38 +805,272 @@ static void hexdump2_print(const uint8_t *data, uint32_t length,
 	}
 }
 
+static int mipi_vprintf_formatter(cbprintf_cb out, void *ctx,
+			  const char *fmt, va_list ap)
+{
+	struct log_msg2 *msg = ctx;
+	uint32_t severity = level_to_syst_severity(log_msg2_get_level(msg));
+
+	MIPI_SYST_VPRINTF(&log_syst_handle, severity, fmt, ap);
+
+	return 0;
+}
+
+#ifdef CONFIG_LOG_MIPI_SYST_USE_CATALOG
+
+#ifdef CONFIG_64BIT
+#define MIPI_SYST_CATMSG_ARGS_COPY MIPI_SYST_CATALOG64_ARGS_COPY
+#else
+#define MIPI_SYST_CATMSG_ARGS_COPY MIPI_SYST_CATALOG32_ARGS_COPY
+#endif
+
+static inline bool is_in_log_strings_section(const void *addr)
+{
+	extern const char __log_strings_start[];
+	extern const char __log_strings_end[];
+
+	if (((const char *)addr >= (const char *)__log_strings_start) &&
+	    ((const char *)addr < (const char *)__log_strings_end)) {
+		return true;
+	}
+
+	return false;
+}
+
+
+static struct k_spinlock payload_lock;
+static uint8_t payload_buf[CONFIG_LOG_MIPI_SYST_CATALOG_ARGS_BUFFER_SIZE];
+
+static int mipi_catalog_formatter(cbprintf_cb out, void *ctx,
+				  const char *fmt, va_list ap)
+{
+	struct log_msg2 *msg = ctx;
+	uint32_t severity = level_to_syst_severity(log_msg2_get_level(msg));
+	k_spinlock_key_t key;
+
+	union {
+		mipi_syst_u64 v64;
+		mipi_syst_u32 v32;
+
+		unsigned int u;
+		unsigned long lu;
+		unsigned long long llu;
+
+		double d;
+
+		void *p;
+	} val;
+
+	const char *s;
+	size_t arg_sz;
+
+	uint8_t *argp = payload_buf;
+	const uint8_t * const argEob = payload_buf + sizeof(payload_buf);
+
+	size_t payload_sz;
+
+	key = k_spin_lock(&payload_lock);
+
+	for (int arg_tag = va_arg(ap, int);
+	     arg_tag != CBPRINTF_PACKAGE_ARG_TYPE_END;
+	     arg_tag = va_arg(ap, int)) {
+
+		switch (arg_tag) {
+		case CBPRINTF_PACKAGE_ARG_TYPE_CHAR:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_UNSIGNED_CHAR:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_SHORT:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_UNSIGNED_SHORT:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_INT:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_UNSIGNED_INT:
+			val.u = (unsigned int)va_arg(ap, unsigned int);
+			arg_sz = sizeof(unsigned int);
+			break;
+
+		case CBPRINTF_PACKAGE_ARG_TYPE_LONG:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_UNSIGNED_LONG:
+			val.lu = (unsigned long)va_arg(ap, unsigned long);
+			arg_sz = sizeof(unsigned long);
+			break;
+
+		case CBPRINTF_PACKAGE_ARG_TYPE_LONG_LONG:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_UNSIGNED_LONG_LONG:
+			val.llu = (unsigned long long)va_arg(ap, unsigned long long);
+			arg_sz = sizeof(unsigned long long);
+			break;
+
+		case CBPRINTF_PACKAGE_ARG_TYPE_FLOAT:
+			__fallthrough;
+		case CBPRINTF_PACKAGE_ARG_TYPE_DOUBLE:
+			val.d = (double)va_arg(ap, double);
+			arg_sz = sizeof(double);
+			break;
+
+		case CBPRINTF_PACKAGE_ARG_TYPE_LONG_DOUBLE:
+			/* Handle long double as double */
+			val.d = (double)va_arg(ap, long double);
+			arg_sz = sizeof(double);
+			break;
+
+		case CBPRINTF_PACKAGE_ARG_TYPE_PTR_VOID:
+			val.p = (void *)va_arg(ap, void *);
+			arg_sz = sizeof(void *);
+			break;
+
+		case CBPRINTF_PACKAGE_ARG_TYPE_PTR_CHAR:
+			s = va_arg(ap, char *);
+			while (argp < argEob) {
+				*argp++ = *s;
+				if (*s == 0) {
+					break;
+				}
+				s++;
+
+				if (argp == argEob) {
+					goto no_space;
+				}
+			}
+			continue;
+
+		default:
+			k_spin_unlock(&payload_lock, key);
+			return -EINVAL;
+		}
+
+		if (argp + arg_sz >= argEob) {
+			goto no_space;
+		}
+
+		if (arg_sz == sizeof(mipi_syst_u64)) {
+			*((mipi_syst_u64 *)argp) =
+				(mipi_syst_u64)MIPI_SYST_HTOLE64(val.v64);
+		} else {
+			*((mipi_syst_u32 *)argp) =
+				(mipi_syst_u32)MIPI_SYST_HTOLE32(val.v32);
+		}
+		argp += arg_sz;
+	}
+
+	/* Calculate how much buffer has been used */
+	payload_sz = argp - payload_buf;
+
+	MIPI_SYST_CATMSG_ARGS_COPY(&log_syst_handle, severity,
+				   (uintptr_t)fmt,
+				   payload_buf,
+				   payload_sz);
+
+	k_spin_unlock(&payload_lock, key);
+
+	return 0;
+
+no_space:
+	k_spin_unlock(&payload_lock, key);
+	return -ENOSPC;
+}
+#endif /* CONFIG_LOG_MIPI_SYST_USE_CATALOG */
+
 void log_output_msg2_syst_process(const struct log_output *output,
 				struct log_msg2 *msg, uint32_t flag)
 {
-	uint32_t severity = level_to_syst_severity(log_msg2_get_level(msg));
 	size_t len, hexdump_len;
 
 	update_systh_platform_data(&log_syst_handle, output, flag);
 
+#ifdef CONFIG_LOG_MIPI_SYST_OUTPUT_LOG_MSG_SRC_ID
+	uint8_t level = log_msg2_get_level(msg);
+	bool raw_string = (level == LOG_LEVEL_INTERNAL_RAW_STRING);
+	int16_t source_id = CONFIG_LOG_MIPI_SYST_MSG_DEFAULT_MODULE_ID;
+
+	/* Set the log source ID as Sys-T message module ID */
+	if (!raw_string) {
+		void *source = (void *)log_msg2_get_source(msg);
+
+		if (source != NULL) {
+			source_id = IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING) ?
+					log_dynamic_source_id(source) :
+					log_const_source_id(source);
+		}
+	}
+
+	update_handle_origin_unit(&log_syst_handle, source_id);
+#endif
+
 	uint8_t *data = log_msg2_get_package(msg, &len);
 
 	if (len) {
-		char *buf = data, *fmt;
+#ifdef CONFIG_LOG_MIPI_SYST_USE_CATALOG
+		struct cbprintf_package_hdr_ext *pkg_hdr = (void *)data;
+		bool is_cat_msg = false, skip = false;
 
-		fmt = ((char **)buf)[1];
-		buf += sizeof(char *) * 2;
+		if (is_in_log_strings_section(pkg_hdr->fmt)) {
+			if ((pkg_hdr->hdr.desc.pkg_flags & CBPRINTF_PACKAGE_ARGS_ARE_TAGGED) ==
+			    CBPRINTF_PACKAGE_ARGS_ARE_TAGGED) {
+				/*
+				 * Only if the package has tagged argument and
+				 * the format string is in the log strings section,
+				 * then we treat it as catalog message, because:
+				 *
+				 * 1. mipi_catalog_formatter() can only deal with
+				 *    tagged arguments; and,
+				 * 2. the collateral XML file only contains strings
+				 *    in the log strings section.
+				 */
+				is_cat_msg = true;
+			} else {
+				/*
+				 * The format string is in log strings section
+				 * but the package does not have tagged argument.
+				 * This cannot be processed as a catalog message,
+				 * and also means we cannot print the message as
+				 * it is highly likely that the log strings section
+				 * has been stripped from binary and cannot be
+				 * accessed.
+				 */
+				skip = true;
+			}
+		}
 
-		union {
-			va_list ap;
-			void *ptr;
-		} u;
+		if (is_cat_msg) {
+			(void)cbpprintf_external(NULL,
+						 mipi_catalog_formatter,
+						 msg, data);
+		} else if (!skip)
+#endif
+		{
+#ifdef CONFIG_CBPRINTF_PACKAGE_HEADER_STORE_CREATION_FLAGS
+			struct cbprintf_package_desc *pkg_hdr = (void *)data;
 
-		u.ptr = buf;
+			CHECKIF((pkg_hdr->pkg_flags & CBPRINTF_PACKAGE_ARGS_ARE_TAGGED) ==
+				CBPRINTF_PACKAGE_ARGS_ARE_TAGGED) {
+				/*
+				 * Tagged arguments are to be used with catalog messages,
+				 * and should not be used for non-tagged ones.
+				 */
+				return;
+			}
+#endif
 
-		MIPI_SYST_VPRINTF(&log_syst_handle, severity, fmt, u.ap);
+
+			(void)cbpprintf_external(NULL,
+						 mipi_vprintf_formatter,
+						 msg, data);
+		}
 	}
 
 	data = log_msg2_get_data(msg, &hexdump_len);
 	if (hexdump_len) {
+		uint32_t severity = level_to_syst_severity(log_msg2_get_level(msg));
+
 		hexdump2_print(data, hexdump_len, severity);
 	}
 }
-#endif
+#endif /* !CONFIG_LOG2 */
 
 static int syst_init(const struct device *arg)
 {
@@ -817,6 +1081,17 @@ static int syst_init(const struct device *arg)
 
 	MIPI_SYST_INIT_HANDLE_STATE(&log_syst_header,
 				    &log_syst_handle, NULL);
+
+	log_syst_handle.systh_tag.et_guid = 0;
+
+#ifndef CONFIG_LOG_MIPI_SYST_OUTPUT_LOG_MSG_SRC_ID
+	/* Set the default here once as it won't be modified anymore. */
+	log_syst_handle.systh_tag.et_modunit =
+		_MIPI_SYST_MK_MODUNIT_ORIGIN(
+			CONFIG_LOG_MIPI_SYST_MSG_DEFAULT_MODULE_ID,
+			CONFIG_LOG_MIPI_SYST_MSG_DEFAULT_UNIT_ID
+		);
+#endif
 
 	return 0;
 }

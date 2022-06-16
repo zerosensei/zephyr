@@ -5,11 +5,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <pm/device.h>
-#include <pm/device_runtime.h>
-#include <sys/__assert.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/pm/device_runtime.h>
+#include <zephyr/sys/__assert.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(pm_device, CONFIG_PM_DEVICE_LOG_LEVEL);
 
 #ifdef CONFIG_PM_DEVICE_POWER_DOMAIN
@@ -88,7 +88,8 @@ unlock:
 static void runtime_suspend_work(struct k_work *work)
 {
 	int ret;
-	struct pm_device *pm = CONTAINER_OF(work, struct pm_device, work);
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct pm_device *pm = CONTAINER_OF(dwork, struct pm_device, work);
 
 	ret = pm->action_cb(pm->dev, PM_DEVICE_ACTION_SUSPEND);
 
@@ -117,6 +118,10 @@ int pm_device_runtime_get(const struct device *dev)
 {
 	int ret = 0;
 	struct pm_device *pm = dev->pm;
+
+	if (pm == NULL) {
+		return -ENOTSUP;
+	}
 
 	SYS_PORT_TRACING_FUNC_ENTER(pm, device_runtime_get, dev);
 
@@ -174,6 +179,10 @@ int pm_device_runtime_put(const struct device *dev)
 {
 	int ret;
 
+	if (dev->pm == NULL) {
+		return -ENOTSUP;
+	}
+
 	SYS_PORT_TRACING_FUNC_ENTER(pm, device_runtime_put, dev);
 	ret = runtime_suspend(dev, false);
 
@@ -192,6 +201,10 @@ int pm_device_runtime_put_async(const struct device *dev)
 {
 	int ret;
 
+	if (dev->pm == NULL) {
+		return -ENOTSUP;
+	}
+
 	SYS_PORT_TRACING_FUNC_ENTER(pm, device_runtime_put_async, dev);
 	ret = runtime_suspend(dev, true);
 	SYS_PORT_TRACING_FUNC_EXIT(pm, device_runtime_put_async, dev, ret);
@@ -203,6 +216,10 @@ int pm_device_runtime_enable(const struct device *dev)
 {
 	int ret = 0;
 	struct pm_device *pm = dev->pm;
+
+	if (pm == NULL) {
+		return -ENOTSUP;
+	}
 
 	SYS_PORT_TRACING_FUNC_ENTER(pm, device_runtime_enable, dev);
 
@@ -252,6 +269,10 @@ int pm_device_runtime_disable(const struct device *dev)
 	int ret = 0;
 	struct pm_device *pm = dev->pm;
 
+	if (pm == NULL) {
+		return -ENOTSUP;
+	}
+
 	SYS_PORT_TRACING_FUNC_ENTER(pm, device_runtime_disable, dev);
 
 	if (!k_is_pre_kernel()) {
@@ -296,5 +317,5 @@ bool pm_device_runtime_is_enabled(const struct device *dev)
 {
 	struct pm_device *pm = dev->pm;
 
-	return atomic_test_bit(&pm->flags, PM_DEVICE_FLAG_RUNTIME_ENABLED);
+	return pm && atomic_test_bit(&pm->flags, PM_DEVICE_FLAG_RUNTIME_ENABLED);
 }

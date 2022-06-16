@@ -7,14 +7,14 @@
  */
 
 #include <errno.h>
-#include <sys/atomic.h>
-#include <sys/byteorder.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/byteorder.h>
 
-#include <drivers/bluetooth/hci_driver.h>
-#include <bluetooth/buf.h>
-#include <bluetooth/hci_raw.h>
-#include <bluetooth/l2cap.h>
-#include <bluetooth/iso.h>
+#include <zephyr/drivers/bluetooth/hci_driver.h>
+#include <zephyr/bluetooth/buf.h>
+#include <zephyr/bluetooth/hci_raw.h>
+#include <zephyr/bluetooth/l2cap.h>
+#include <zephyr/bluetooth/iso.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_CORE)
 #define LOG_MODULE_NAME bt_hci_raw
@@ -159,6 +159,11 @@ struct net_buf *bt_buf_get_tx(enum bt_buf_type type, k_timeout_t timeout,
 	bt_buf_set_type(buf, type);
 
 	if (data && size) {
+		if (net_buf_tailroom(buf) < size) {
+			net_buf_unref(buf);
+			return NULL;
+		}
+
 		net_buf_add_mem(buf, data, size);
 	}
 
@@ -296,6 +301,10 @@ static uint8_t bt_send_ext(struct net_buf *buf)
 int bt_send(struct net_buf *buf)
 {
 	BT_DBG("buf %p len %u", buf, buf->len);
+
+	if (buf->len == 0) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
 
 	bt_monitor_send(bt_monitor_opcode(buf), buf->data, buf->len);
 

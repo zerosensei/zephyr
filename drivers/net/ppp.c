@@ -12,26 +12,26 @@
  */
 
 #define LOG_LEVEL CONFIG_NET_PPP_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_ppp, LOG_LEVEL);
 
 #include <stdio.h>
 
-#include <kernel.h>
+#include <zephyr/kernel.h>
 
 #include <stdbool.h>
 #include <errno.h>
 #include <stddef.h>
-#include <net/ppp.h>
-#include <net/buf.h>
-#include <net/net_pkt.h>
-#include <net/net_if.h>
-#include <net/net_core.h>
-#include <sys/ring_buffer.h>
-#include <sys/crc.h>
-#include <drivers/uart.h>
-#include <drivers/console/uart_mux.h>
-#include <random/rand32.h>
+#include <zephyr/net/ppp.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/net/net_pkt.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/sys/ring_buffer.h>
+#include <zephyr/sys/crc.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/console/uart_mux.h>
+#include <zephyr/random/rand32.h>
 
 #include "../../subsys/net/ip/net_stats.h"
 #include "../../subsys/net/ip/net_private.h"
@@ -220,7 +220,7 @@ static int ppp_async_uart_rx_enable(struct ppp_driver_context *context)
 	}
 
 	err = uart_rx_enable(context->dev, context->buf, sizeof(context->buf),
-			     CONFIG_NET_PPP_ASYNC_UART_RX_ENABLE_TIMEOUT);
+			     CONFIG_NET_PPP_ASYNC_UART_RX_ENABLE_TIMEOUT * USEC_PER_MSEC);
 	if (err) {
 		LOG_ERR("uart_rx_enable() failed, err %d", err);
 	} else {
@@ -370,7 +370,8 @@ static int ppp_send_flush(struct ppp_driver_context *ppp, int off)
 
 		k_sem_take(&uarte_tx_finished, K_FOREVER);
 
-		ret = uart_tx(ppp->dev, buf, off, CONFIG_NET_PPP_ASYNC_UART_TX_TIMEOUT);
+		ret = uart_tx(ppp->dev, buf, off,
+			      CONFIG_NET_PPP_ASYNC_UART_TX_TIMEOUT * USEC_PER_MSEC);
 		if (ret) {
 			LOG_ERR("uart_tx() failed, err %d", ret);
 			k_sem_give(&uarte_tx_finished);

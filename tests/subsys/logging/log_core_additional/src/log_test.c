@@ -12,13 +12,13 @@
 
 #include <tc_util.h>
 #include <stdbool.h>
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <ztest.h>
-#include <logging/log_backend.h>
-#include <logging/log_backend_std.h>
-#include <logging/log_ctrl.h>
-#include <logging/log.h>
-#include <logging/log_output.h>
+#include <zephyr/logging/log_backend.h>
+#include <zephyr/logging/log_backend_std.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_output.h>
 
 #define LOG_MODULE_NAME log_test
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_INF);
@@ -107,66 +107,14 @@ static void process(const struct log_backend *const backend,
 	log_output_msg2_process(&log_output, &msg->log, flags);
 }
 
-static void put(struct log_backend const *const backend, struct log_msg *msg)
+static void panic(const struct log_backend *const backend)
 {
-	log_msg_get(msg);
-	struct backend_cb *cb = (struct backend_cb *)backend->cb->ctx;
-
-	if (cb->check_domain_id) {
-		zassert_equal(log_msg_domain_id_get(msg), CONFIG_LOG_DOMAIN_ID,
-				"Unexpected domain id");
-	}
-
-	if (cb->check_timestamp) {
-		uint32_t exp_timestamp = cb->exp_timestamps[cb->counter];
-
-		zassert_equal(log_msg_timestamp_get(msg), exp_timestamp,
-			      "Unexpected message index");
-	}
-
-	if (cb->check_severity) {
-		zassert_equal(log_msg_level_get(msg),
-			      cb->exp_severity[cb->counter],
-			      "Unexpected log severity");
-	}
-
-	cb->counter++;
-	if (IS_ENABLED(CONFIG_LOG_PROCESS_THREAD)) {
-		if (cb->counter == cb->total_logs) {
-			k_sem_give(&log_sem);
-		}
-	}
-	log_msg_put(msg);
-}
-
-static void sync_string(const struct log_backend *const backend,
-		     struct log_msg_ids src_level, uint32_t timestamp,
-		     const char *fmt, va_list ap)
-{
-	struct backend_cb *cb = (struct backend_cb *)backend->cb->ctx;
-
-	cb->counter++;
-	cb->sync++;
-}
-
-static void sync_hexdump(const struct log_backend *const backend,
-			 struct log_msg_ids src_level, uint32_t timestamp,
-			 const char *metadata, const uint8_t *data,
-			 uint32_t length)
-{
-	struct backend_cb *cb = (struct backend_cb *)backend->cb->ctx;
-
-	cb->counter++;
-	cb->sync++;
+	ARG_UNUSED(backend);
 }
 
 const struct log_backend_api log_backend_test_api = {
-	.process = IS_ENABLED(CONFIG_LOG2) ? process : NULL,
-	.put = IS_ENABLED(CONFIG_LOG1_DEFERRED) ? put : NULL,
-	.put_sync_string = IS_ENABLED(CONFIG_LOG1_IMMEDIATE) ?
-			sync_string : NULL,
-	.put_sync_hexdump = IS_ENABLED(CONFIG_LOG1_IMMEDIATE) ?
-			sync_hexdump : NULL,
+	.process = process,
+	.panic = panic,
 };
 
 LOG_BACKEND_DEFINE(backend1, log_backend_test_api, false);
@@ -178,7 +126,7 @@ struct backend_cb backend2_cb;
 /* The logging system support user customize timestamping in log messages
  * by register a timestamp function, in timestamp_get() below, just return
  * a counter as timestamp for different messages.
- * when install this timestamp function, timestamping frequence is set to
+ * when install this timestamp function, timestamping frequency is set to
  * 2000000, means 2 timestamp/us
  */
 static uint32_t stamp;
@@ -257,7 +205,7 @@ void test_log_domain_id(void)
 
 void test_log_sync(void)
 {
-	TC_PRINT("Logging synchronousely\n");
+	TC_PRINT("Logging synchronously\n");
 
 	if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
 		log_setup(false);
@@ -509,17 +457,17 @@ void test_log_generic(void)
 void test_log_msg2_create(void)
 {
 	log_setup(false);
-	if (!IS_ENABLED(CONFIG_LOG1) && IS_ENABLED(CONFIG_LOG_MODE_DEFERRED)) {
+	if (IS_ENABLED(CONFIG_LOG_MODE_DEFERRED)) {
 		int mode;
 
 		domain = 3;
 		level = 2;
 
 		z_log_msg2_runtime_create(domain, __log_current_const_data,
-					  level, &msg_data,
+					  level, &msg_data, 0,
 					  sizeof(msg_data), NULL);
 		/* try z_log_msg2_static_create() */
-		Z_LOG_MSG2_STACK_CREATE(domain, __log_current_const_data,
+		Z_LOG_MSG2_STACK_CREATE(0, domain, __log_current_const_data,
 					level, &msg_data,
 					sizeof(msg_data), NULL);
 
@@ -534,26 +482,24 @@ void test_log_msg2_create(void)
 
 void test_log_msg2_create_user(void)
 {
-	if (IS_ENABLED(CONFIG_LOG2)) {
-		int mode;
+	int mode;
 
-		domain = 3;
-		level = 2;
+	domain = 3;
+	level = 2;
 
-		z_log_msg2_runtime_create(domain, NULL,
-					  level, &msg_data,
-					  sizeof(msg_data), test_msg_usr);
-		/* try z_log_msg2_static_create() */
-		Z_LOG_MSG2_STACK_CREATE(domain, NULL,
-					level, &msg_data,
-					sizeof(msg_data), test_msg_usr);
+	z_log_msg2_runtime_create(domain, NULL,
+				  level, &msg_data, 0,
+				  sizeof(msg_data), test_msg_usr);
+	/* try z_log_msg2_static_create() */
+	Z_LOG_MSG2_STACK_CREATE(0, domain, NULL,
+				level, &msg_data,
+				sizeof(msg_data), test_msg_usr);
 
-		Z_LOG_MSG2_CREATE(!IS_ENABLED(CONFIG_USERSPACE), mode,
-			  CONFIG_LOG_DOMAIN_ID, NULL,
-			  LOG_LEVEL_INTERNAL_RAW_STRING, NULL, 0, test_msg_usr);
+	Z_LOG_MSG2_CREATE(!IS_ENABLED(CONFIG_USERSPACE), mode,
+		  CONFIG_LOG_DOMAIN_ID, NULL,
+		  LOG_LEVEL_INTERNAL_RAW_STRING, NULL, 0, test_msg_usr);
 
-		while (log_test_process(false)) {
-		}
+	while (log_test_process(false)) {
 	}
 }
 /* The log process thread has the K_LOWEST_APPLICATION_THREAD_PRIO, adjust it

@@ -10,7 +10,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_pkt, CONFIG_NET_PKT_LOG_LEVEL);
 
 /* This enables allocation debugging but does not print so much output
@@ -23,20 +23,20 @@ LOG_MODULE_REGISTER(net_pkt, CONFIG_NET_PKT_LOG_LEVEL);
 #define NET_LOG_LEVEL CONFIG_NET_PKT_LOG_LEVEL
 #endif
 
-#include <kernel.h>
-#include <toolchain.h>
+#include <zephyr/kernel.h>
+#include <zephyr/toolchain.h>
 #include <string.h>
 #include <zephyr/types.h>
 #include <sys/types.h>
 
-#include <sys/util.h>
+#include <zephyr/sys/util.h>
 
-#include <net/net_core.h>
-#include <net/net_ip.h>
-#include <net/buf.h>
-#include <net/net_pkt.h>
-#include <net/ethernet.h>
-#include <net/udp.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/net/net_pkt.h>
+#include <zephyr/net/ethernet.h>
+#include <zephyr/net/udp.h>
 
 #include "net_private.h"
 #include "tcp_internal.h"
@@ -1793,6 +1793,7 @@ static void clone_pkt_attributes(struct net_pkt *pkt, struct net_pkt *clone_pkt)
 	}
 
 #if defined(CONFIG_IEEE802154)
+	/* ieee802154_rssi and ieee802154_txpwr form a union, copying one of them is enough */
 	net_pkt_set_ieee802154_rssi(clone_pkt, net_pkt_ieee802154_rssi(pkt));
 	net_pkt_set_ieee802154_lqi(clone_pkt, net_pkt_ieee802154_lqi(pkt));
 	net_pkt_set_ieee802154_arb(clone_pkt, net_pkt_ieee802154_arb(pkt));
@@ -1808,19 +1809,21 @@ static void clone_pkt_attributes(struct net_pkt *pkt, struct net_pkt *clone_pkt)
 #endif
 }
 
-struct net_pkt *net_pkt_clone(struct net_pkt *pkt, k_timeout_t timeout)
+static struct net_pkt *net_pkt_clone_internal(struct net_pkt *pkt,
+					      struct k_mem_slab *slab,
+					      k_timeout_t timeout)
 {
 	size_t cursor_offset = net_pkt_get_current_offset(pkt);
 	struct net_pkt *clone_pkt;
 	struct net_pkt_cursor backup;
 
 #if NET_LOG_LEVEL >= LOG_LEVEL_DBG
-	clone_pkt = pkt_alloc_with_buffer(pkt->slab, net_pkt_iface(pkt),
+	clone_pkt = pkt_alloc_with_buffer(slab, net_pkt_iface(pkt),
 					  net_pkt_get_len(pkt),
 					  AF_UNSPEC, 0, timeout,
 					  __func__, __LINE__);
 #else
-	clone_pkt = pkt_alloc_with_buffer(pkt->slab, net_pkt_iface(pkt),
+	clone_pkt = pkt_alloc_with_buffer(slab, net_pkt_iface(pkt),
 					  net_pkt_get_len(pkt),
 					  AF_UNSPEC, 0, timeout);
 #endif
@@ -1864,6 +1867,16 @@ struct net_pkt *net_pkt_clone(struct net_pkt *pkt, k_timeout_t timeout)
 	return clone_pkt;
 }
 
+struct net_pkt *net_pkt_clone(struct net_pkt *pkt, k_timeout_t timeout)
+{
+	return net_pkt_clone_internal(pkt, pkt->slab, timeout);
+}
+
+struct net_pkt *net_pkt_rx_clone(struct net_pkt *pkt, k_timeout_t timeout)
+{
+	return net_pkt_clone_internal(pkt, &rx_pkts, timeout);
+}
+
 struct net_pkt *net_pkt_shallow_clone(struct net_pkt *pkt, k_timeout_t timeout)
 {
 	struct net_pkt *clone_pkt;
@@ -1878,10 +1891,7 @@ struct net_pkt *net_pkt_shallow_clone(struct net_pkt *pkt, k_timeout_t timeout)
 	clone_pkt->buffer = pkt->buffer;
 	buf = pkt->buffer;
 
-	while (buf) {
-		net_pkt_frag_ref(buf);
-		buf = buf->frags;
-	}
+	net_pkt_frag_ref(buf);
 
 	if (pkt->buffer) {
 		/* The link header pointers are only usable if there is

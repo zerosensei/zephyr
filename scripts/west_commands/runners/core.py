@@ -552,11 +552,9 @@ class ZephyrBinaryRunner(abc.ABC):
     @property
     def thread_info_enabled(self) -> bool:
         '''Returns True if self.build_conf has
-        CONFIG_DEBUG_THREAD_INFO enabled. This supports the
-        CONFIG_OPENOCD_SUPPORT fallback as well for now.
+        CONFIG_DEBUG_THREAD_INFO enabled.
         '''
-        return (self.build_conf.getboolean('CONFIG_DEBUG_THREAD_INFO') or
-                self.build_conf.getboolean('CONFIG_OPENOCD_SUPPORT'))
+        return self.build_conf.getboolean('CONFIG_DEBUG_THREAD_INFO')
 
     @classmethod
     def dev_id_help(cls) -> str:
@@ -653,7 +651,7 @@ class ZephyrBinaryRunner(abc.ABC):
             return b''
         return subprocess.check_output(cmd, **kwargs)
 
-    def popen_ignore_int(self, cmd: List[str]) -> subprocess.Popen:
+    def popen_ignore_int(self, cmd: List[str], **kwargs) -> subprocess.Popen:
         '''Spawn a child command, ensuring it ignores SIGINT.
 
         The returned subprocess.Popen object must be manually terminated.'''
@@ -673,7 +671,7 @@ class ZephyrBinaryRunner(abc.ABC):
         if _DRY_RUN:
             return _DebugDummyPopen()  # type: ignore
 
-        return subprocess.Popen(cmd, creationflags=cflags, preexec_fn=preexec)
+        return subprocess.Popen(cmd, creationflags=cflags, preexec_fn=preexec, **kwargs)
 
     def ensure_output(self, output_type: str) -> None:
         '''Ensure self.cfg has a particular output artifact.

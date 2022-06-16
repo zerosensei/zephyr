@@ -7,22 +7,22 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <errno.h>
-#include <zephyr.h>
-#include <sys/printk.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/sys/printk.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/direction.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
-#include <sys/byteorder.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/direction.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/sys/byteorder.h>
 
 /* Latency set to zero, to enforce PDU exchange every connection event */
 #define CONN_LATENCY 0U
 /* Arbitrary selected timeout value */
 #define CONN_TIMEOUT 400U
-/* Inteval used to run CTE request procedure periodically.
+/* Interval used to run CTE request procedure periodically.
  * Value is a number of connection events.
  */
 #define CTE_REQ_INTERVAL (CONN_LATENCY + 10U)
@@ -35,9 +35,9 @@ static struct bt_conn *default_conn;
 static const struct bt_le_conn_param conn_params = BT_LE_CONN_PARAM_INIT(
 	BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MAX, CONN_LATENCY, CONN_TIMEOUT);
 
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
+#if defined(CONFIG_BT_DF_CTE_RX_AOA)
 static const uint8_t ant_patterns[] = { 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA };
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_RX */
+#endif /* CONFIG_BT_DF_CTE_RX_AOA */
 
 static void start_scan(void);
 
@@ -129,24 +129,24 @@ static void enable_cte_reqest(void)
 	int err;
 
 	const struct bt_df_conn_cte_rx_param cte_rx_params = {
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
+#if defined(CONFIG_BT_DF_CTE_RX_AOA)
 		.cte_types = BT_DF_CTE_TYPE_ALL,
 		.slot_durations = 0x2,
 		.num_ant_ids = ARRAY_SIZE(ant_patterns),
 		.ant_ids = ant_patterns,
 #else
 		.cte_types = BT_DF_CTE_TYPE_AOD_1US | BT_DF_CTE_TYPE_AOD_2US,
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_RX */
+#endif /* CONFIG_BT_DF_CTE_RX_AOA */
 	};
 
 	const struct bt_df_conn_cte_req_params cte_req_params = {
 		.interval = CTE_REQ_INTERVAL,
 		.cte_length = CTE_LEN,
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
+#if defined(CONFIG_BT_DF_CTE_RX_AOA)
 		.cte_type = BT_DF_CTE_TYPE_AOA,
 #else
 		.cte_type = BT_DF_CTE_TYPE_AOD_2US,
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_TX */
+#endif /* CONFIG_BT_DF_CTE_RX_AOA */
 	};
 
 	printk("Enable receiving of CTE...\n");

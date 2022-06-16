@@ -8,12 +8,12 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#include <toolchain.h>
+#include <zephyr/toolchain.h>
 
 #include <soc.h>
-#include <device.h>
+#include <zephyr/device.h>
 
-#include <drivers/entropy.h>
+#include <zephyr/drivers/entropy.h>
 
 #include "hal/swi.h"
 #include "hal/ccm.h"
@@ -69,7 +69,8 @@ static struct lll_event *resume_enqueue(lll_prepare_cb_t resume_cb);
 static void isr_race(void *param);
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
-static uint32_t preempt_ticker_start(struct lll_event *prev,
+static uint32_t preempt_ticker_start(struct lll_event *first,
+				     struct lll_event *prev,
 				     struct lll_event *next);
 static uint32_t preempt_ticker_stop(void);
 static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
@@ -201,12 +202,34 @@ int lll_init(void)
 	irq_enable(RADIO_IRQn);
 	irq_enable(RTC0_IRQn);
 	irq_enable(HAL_SWI_RADIO_IRQ);
-#if defined(CONFIG_BT_CTLR_LOW_LAT) || \
-	(CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)
-	irq_enable(HAL_SWI_JOB_IRQ);
-#endif
+	if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT) ||
+		(CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)) {
+		irq_enable(HAL_SWI_JOB_IRQ);
+	}
 
 	radio_setup();
+
+	return 0;
+}
+
+int lll_deinit(void)
+{
+	int err;
+
+	/* Release clocks */
+	err = lll_clock_deinit();
+	if (err < 0) {
+		return err;
+	}
+
+	/* Disable IRQs */
+	irq_disable(RADIO_IRQn);
+	irq_disable(RTC0_IRQn);
+	irq_disable(HAL_SWI_RADIO_IRQ);
+	if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT) ||
+		(CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)) {
+		irq_disable(HAL_SWI_JOB_IRQ);
+	}
 
 	return 0;
 }
@@ -375,9 +398,14 @@ void lll_done_ull_inc(void)
 }
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 
-bool lll_is_done(void *param)
+bool lll_is_done(void *param, bool *is_resume)
 {
-	/* FIXME: use param to check */
+	/* NOTE: Current radio event when preempted could put itself in resume
+	 *       into the prepare pipeline in which case event.curr.param would
+	 *       be set to NULL.
+	 */
+	*is_resume = (param != event.curr.param);
+
 	return !event.curr.abort_cb;
 }
 
@@ -538,7 +566,9 @@ void lll_isr_status_reset(void)
 	radio_status_reset();
 	radio_tmr_status_reset();
 	radio_filter_status_reset();
-	radio_ar_status_reset();
+	if (IS_ENABLED(CONFIG_BT_CTLR_PRIVACY)) {
+		radio_ar_status_reset();
+	}
 	radio_rssi_status_reset();
 
 	if (IS_ENABLED(HAL_RADIO_GPIO_HAVE_PA_PIN) ||
@@ -568,6 +598,7 @@ void lll_isr_cleanup(void *param)
 	}
 
 	radio_tmr_stop();
+	radio_stop();
 
 	err = lll_hfclock_off();
 	LL_ASSERT(err >= 0);
@@ -652,10 +683,12 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 			return -EINPROGRESS;
 		}
 
-		/* Start the preempt timeout */
+		/* Always start preempt timeout for first prepare in pipeline */
+		struct lll_event *first = p ? p : next;
 		uint32_t ret;
 
-		ret  = preempt_ticker_start(p, next);
+		/* Start the preempt timeout */
+		ret  = preempt_ticker_start(first, p, next);
 		LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
 			  (ret == TICKER_STATUS_BUSY));
 
@@ -719,7 +752,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 	} while (p->is_aborted || p->is_resume);
 
 	/* Start the preempt timeout */
-	ret = preempt_ticker_start(NULL, p);
+	ret = preempt_ticker_start(p, NULL, p);
 	LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
 		  (ret == TICKER_STATUS_BUSY));
 #endif /* !CONFIG_BT_CTLR_LOW_LAT */
@@ -731,6 +764,10 @@ static struct lll_event *resume_enqueue(lll_prepare_cb_t resume_cb)
 {
 	struct lll_prepare_param prepare_param = {0};
 
+	/* Enqueue into prepare pipeline as resume radio event, and remove
+	 * parameter assignment from currently active radio event so that
+	 * done event is not generated.
+	 */
 	prepare_param.param = event.curr.param;
 	event.curr.param = NULL;
 
@@ -775,31 +812,33 @@ static void ticker_start_op_cb(uint32_t status, void *param)
 	preempt_req++;
 }
 
-static uint32_t preempt_ticker_start(struct lll_event *prev,
+static uint32_t preempt_ticker_start(struct lll_event *first,
+				     struct lll_event *prev,
 				     struct lll_event *next)
 {
+	const struct lll_prepare_param *p;
 	static uint32_t ticks_at_preempt;
 	uint32_t ticks_at_preempt_new;
-	struct lll_prepare_param *p;
 	uint32_t preempt_anchor;
 	struct ull_hdr *ull;
 	uint32_t preempt_to;
 	uint32_t ret;
 
-	/* Calc the preempt timeout */
-	p = &next->prepare_param;
-	ull = HDR_LLL2ULL(p->param);
-	preempt_anchor = p->ticks_at_expire;
-	preempt_to = MAX(ull->ticks_active_to_start,
-			 ull->ticks_prepare_to_start) -
-		     ull->ticks_preempt_to_start;
-
-	ticks_at_preempt_new = preempt_anchor + preempt_to;
-
 	/* Do not request to start preempt timeout if already requested */
 	if ((preempt_start_req != preempt_start_ack) ||
 	    (preempt_req != preempt_ack)) {
 		uint32_t diff;
+
+		/* Calc the preempt timeout */
+		p = &next->prepare_param;
+		ull = HDR_LLL2ULL(p->param);
+		preempt_anchor = p->ticks_at_expire;
+		preempt_to = MAX(ull->ticks_active_to_start,
+				 ull->ticks_prepare_to_start) -
+			     ull->ticks_preempt_to_start;
+
+		ticks_at_preempt_new = preempt_anchor + preempt_to;
+		ticks_at_preempt_new &= HAL_TICKER_CNTR_MASK;
 
 		/* Check for short preempt timeouts */
 		diff = ticks_at_preempt_new - ticks_at_preempt;
@@ -808,12 +847,33 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 			return TICKER_STATUS_SUCCESS;
 		}
 
-		preempt_ticker_stop();
+		/* Stop any scheduled preempt ticker */
+		ret = preempt_ticker_stop();
+		LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
+			  (ret == TICKER_STATUS_BUSY));
 
+		/* Set early as we get called again through the call to
+		 * abort_cb().
+		 */
 		ticks_at_preempt = ticks_at_preempt_new;
 
+		/* Abort previous prepare that set the preempt timeout */
 		prev->is_aborted = 1U;
 		prev->abort_cb(&prev->prepare_param, prev->prepare_param.param);
+
+		/* Schedule short preempt timeout */
+		first = next;
+	} else {
+		/* Calc the preempt timeout */
+		p = &first->prepare_param;
+		ull = HDR_LLL2ULL(p->param);
+		preempt_anchor = p->ticks_at_expire;
+		preempt_to = MAX(ull->ticks_active_to_start,
+				 ull->ticks_prepare_to_start) -
+			     ull->ticks_preempt_to_start;
+
+		ticks_at_preempt_new = preempt_anchor + preempt_to;
+		ticks_at_preempt_new &= HAL_TICKER_CNTR_MASK;
 	}
 
 	preempt_start_req++;
@@ -830,8 +890,8 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 			   TICKER_NULL_REMAINDER,
 			   TICKER_NULL_LAZY,
 			   TICKER_NULL_SLOT,
-			   preempt_ticker_cb, next,
-			   ticker_start_op_cb, next);
+			   preempt_ticker_cb, first,
+			   ticker_start_op_cb, first);
 
 	return ret;
 }
@@ -911,7 +971,7 @@ static void preempt(void *param)
 		uint32_t ret;
 
 		/* Start the preempt timeout */
-		ret = preempt_ticker_start(NULL, next);
+		ret = preempt_ticker_start(next, NULL, next);
 		LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
 			  (ret == TICKER_STATUS_BUSY));
 

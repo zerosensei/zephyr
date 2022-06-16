@@ -6,12 +6,12 @@
 
 #define DT_DRV_COMPAT nxp_gpt_hw_timer
 
-#include <device.h>
-#include <drivers/timer/system_timer.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/timer/system_timer.h>
 #include <fsl_gpt.h>
-#include <sys_clock.h>
-#include <spinlock.h>
-#include <sys/time_units.h>
+#include <zephyr/sys_clock.h>
+#include <zephyr/spinlock.h>
+#include <zephyr/sys/time_units.h>
 
 
 
@@ -133,14 +133,11 @@ static uint32_t elapsed(void)
 /* Interrupt fires every time GPT timer reaches set value.
  * GPT timer will reset to 0x0.
  *
- * Note: we use a direct ISR for latency concerns.
  */
-ISR_DIRECT_DECLARE(mcux_imx_gpt_isr)
+void mcux_imx_gpt_isr(const void *arg)
 {
-	/* Note: we do not call PM hooks in this function,
-	 * GPT timer does not need PM
-	 */
-	ISR_DIRECT_HEADER();
+	ARG_UNUSED(arg);
+
 	/* Update the value of 'wrapped_cycles' */
 	elapsed();
 
@@ -167,8 +164,6 @@ ISR_DIRECT_DECLARE(mcux_imx_gpt_isr)
 	/* If system is tickful, interrupt will fire again at next tick */
 	sys_clock_announce(1);
 #endif
-	ISR_DIRECT_FOOTER(1);
-	return 1;
 }
 
 /* Next needed call to sys_clock_announce will not be until the specified number
@@ -192,7 +187,7 @@ void sys_clock_set_timeout(int32_t ticks, bool idle)
 	}
 	ticks = (ticks == K_TICKS_FOREVER) ? MAX_TICKS : ticks;
 	/* Clamp ticks */
-	ticks = CLAMP(ticks - 1, 0, (int32_t)MAX_TICKS);
+	ticks = CLAMP((ticks - 1), 0, (int32_t)MAX_TICKS);
 
 	key = k_spin_lock(&lock);
 
@@ -220,6 +215,13 @@ void sys_clock_set_timeout(int32_t ticks, bool idle)
 		reload_value =
 			((reload_value + CYC_PER_TICK - 1) / CYC_PER_TICK) * CYC_PER_TICK;
 		reload_value -= unannounced_cycles;
+		if (reload_value == ticks * CYC_PER_TICK) {
+			/* We are on a tick boundary. Since we subtracted from
+			 * 'ticks' earlier, we need to add one tick worth of
+			 * cycles to announce to the kernel at the right time.
+			 */
+			reload_value += CYC_PER_TICK;
+		}
 		/* Clamp reload value */
 		reload_value = CLAMP(reload_value, MIN_DELAY, MAX_CYCLES);
 	}
@@ -311,8 +313,8 @@ int sys_clock_driver_init(const struct device *dev)
 
 	ARG_UNUSED(dev);
 	/* Configure ISR. Use instance 0 of the GPT timer */
-	IRQ_DIRECT_CONNECT(DT_IRQN(GPT_INST), DT_IRQ(GPT_INST, priority),
-		    mcux_imx_gpt_isr, 0);
+	IRQ_CONNECT(DT_IRQN(GPT_INST), DT_IRQ(GPT_INST, priority),
+		    mcux_imx_gpt_isr, NULL, 0);
 
 	base = (GPT_Type *)DT_REG_ADDR(GPT_INST);
 

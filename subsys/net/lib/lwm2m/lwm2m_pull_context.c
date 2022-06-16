@@ -8,15 +8,15 @@
 #define LOG_MODULE_NAME net_lwm2m_pull_context
 #define LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <net/http_parser.h>
-#include <net/socket.h>
+#include <zephyr/net/http_parser.h>
+#include <zephyr/net/socket.h>
 
 #include "lwm2m_pull_context.h"
 #include "lwm2m_engine.h"
@@ -364,7 +364,7 @@ static void firmware_transfer(void)
 	server_addr = context.uri;
 #endif
 
-	ret = lwm2m_parse_peerinfo(server_addr, &context.firmware_ctx, &context.is_firmware_uri);
+	ret = lwm2m_parse_peerinfo(server_addr, &context.firmware_ctx, context.is_firmware_uri);
 	if (ret < 0) {
 		LOG_ERR("Failed to parse server URI.");
 		goto error;

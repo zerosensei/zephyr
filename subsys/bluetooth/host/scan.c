@@ -6,14 +6,14 @@
  */
 #include <sys/types.h>
 
-#include <sys/byteorder.h>
-#include <sys/check.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/check.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/iso.h>
-#include <bluetooth/buf.h>
-#include <bluetooth/direction.h>
-#include <bluetooth/addr.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/iso.h>
+#include <zephyr/bluetooth/buf.h>
+#include <zephyr/bluetooth/direction.h>
+#include <zephyr/bluetooth/addr.h>
 
 #include "hci_core.h"
 #include "conn_internal.h"
@@ -330,14 +330,14 @@ int bt_le_scan_update(bool fast_scan)
 
 		/* don't restart scan if we have pending connection */
 		conn = bt_conn_lookup_state_le(BT_ID_DEFAULT, NULL,
-					       BT_CONN_CONNECT);
+					       BT_CONN_CONNECTING);
 		if (conn) {
 			bt_conn_unref(conn);
 			return 0;
 		}
 
 		conn = bt_conn_lookup_state_le(BT_ID_DEFAULT, NULL,
-					       BT_CONN_CONNECT_SCAN);
+					       BT_CONN_CONNECTING_SCAN);
 		if (conn) {
 			atomic_set_bit(bt_dev.flags, BT_DEV_SCAN_FILTER_DUP);
 
@@ -373,7 +373,7 @@ static void check_pending_conn(const bt_addr_le_t *id_addr,
 	}
 
 	conn = bt_conn_lookup_state_le(BT_ID_DEFAULT, id_addr,
-				       BT_CONN_CONNECT_SCAN);
+				       BT_CONN_CONNECTING_SCAN);
 	if (!conn) {
 		return;
 	}
@@ -388,7 +388,7 @@ static void check_pending_conn(const bt_addr_le_t *id_addr,
 		goto failed;
 	}
 
-	bt_conn_set_state(conn, BT_CONN_CONNECT);
+	bt_conn_set_state(conn, BT_CONN_CONNECTING);
 	bt_conn_unref(conn);
 	return;
 
@@ -935,6 +935,20 @@ void bt_hci_le_per_adv_sync_established(struct net_buf *buf)
 	memset(&sync_info, 0, sizeof(sync_info));
 	sync_info.interval = pending_per_adv_sync->interval;
 	sync_info.phy = bt_get_phy(pending_per_adv_sync->phy);
+
+	if (atomic_test_bit(pending_per_adv_sync->flags,
+			    BT_PER_ADV_SYNC_SYNCING_USE_LIST)) {
+		/* Now we know which address and SID we synchronized to. */
+		bt_addr_le_copy(&pending_per_adv_sync->addr, &evt->adv_addr);
+		pending_per_adv_sync->sid = evt->sid;
+
+		/* Translate "enhanced" identity address type to normal one */
+		if (pending_per_adv_sync->addr.type == BT_ADDR_LE_PUBLIC_ID ||
+		    pending_per_adv_sync->addr.type == BT_ADDR_LE_RANDOM_ID) {
+			pending_per_adv_sync->addr.type -= BT_ADDR_LE_PUBLIC_ID;
+		}
+	}
+
 	sync_info.addr = &pending_per_adv_sync->addr;
 	sync_info.sid = pending_per_adv_sync->sid;
 
@@ -1080,11 +1094,17 @@ void bt_hci_le_biginfo_adv_report(struct net_buf *buf)
 #if defined(CONFIG_BT_DF_CONNECTIONLESS_CTE_RX)
 void bt_hci_le_df_connectionless_iq_report(struct net_buf *buf)
 {
+	int err;
+
 	struct bt_df_per_adv_sync_iq_samples_report cte_report;
 	struct bt_le_per_adv_sync *per_adv_sync;
 	struct bt_le_per_adv_sync_cb *listener;
 
-	hci_df_prepare_connectionless_iq_report(buf, &cte_report, &per_adv_sync);
+	err = hci_df_prepare_connectionless_iq_report(buf, &cte_report, &per_adv_sync);
+	if (err) {
+		BT_ERR("Prepare CTE conn IQ report failed %d", err);
+		return;
+	}
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&pa_sync_cbs, listener, node) {
 		if (listener->cte_report_cb) {
@@ -1359,14 +1379,19 @@ int bt_le_per_adv_sync_create(const struct bt_le_per_adv_sync_param *param,
 	cp = net_buf_add(buf, sizeof(*cp));
 	(void)memset(cp, 0, sizeof(*cp));
 
-
-	bt_addr_le_copy(&cp->addr, &param->addr);
-
 	if (param->options & BT_LE_PER_ADV_SYNC_OPT_USE_PER_ADV_LIST) {
 		atomic_set_bit(per_adv_sync->flags,
 			       BT_PER_ADV_SYNC_SYNCING_USE_LIST);
 
 		cp->options |= BT_HCI_LE_PER_ADV_CREATE_SYNC_FP_USE_LIST;
+	} else {
+		/* If BT_LE_PER_ADV_SYNC_OPT_USE_PER_ADV_LIST is set, then the
+		 * address and SID are ignored by the controller, so we only
+		 * copy/assign them in case that the periodic advertising list
+		 * is not used.
+		 */
+		bt_addr_le_copy(&cp->addr, &param->addr);
+		cp->sid = param->sid;
 	}
 
 	if (param->options &
@@ -1401,7 +1426,6 @@ int bt_le_per_adv_sync_create(const struct bt_le_per_adv_sync_param *param,
 		cp->cte_type |= BT_HCI_LE_PER_ADV_CREATE_SYNC_CTE_TYPE_ONLY_CTE;
 	}
 
-	cp->sid = param->sid;
 	cp->skip = sys_cpu_to_le16(param->skip);
 	cp->sync_timeout = sys_cpu_to_le16(param->timeout);
 

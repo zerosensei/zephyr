@@ -13,11 +13,11 @@
 
 #include <tc_util.h>
 #include <stdbool.h>
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <ztest.h>
-#include <logging/log_backend.h>
-#include <logging/log_ctrl.h>
-#include <logging/log.h>
+#include <zephyr/logging/log_backend.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/logging/log.h>
 #include "test_helpers.h"
 
 #define LOG_MODULE_NAME test
@@ -48,13 +48,6 @@ struct backend_cb {
 	uint32_t total_drops;
 };
 
-static void put(struct log_backend const *const backend,
-		struct log_msg *msg)
-{
-	log_msg_get(msg);
-	log_msg_put(msg);
-}
-
 static void process(struct log_backend const *const backend,
 		    union log_msg2_generic *msg)
 {
@@ -75,8 +68,7 @@ static void dropped(struct log_backend const *const backend, uint32_t cnt)
 }
 
 const struct log_backend_api log_backend_test_api = {
-	.put = IS_ENABLED(CONFIG_LOG1_DEFERRED) ? put : NULL,
-	.process = IS_ENABLED(CONFIG_LOG2) ? process : NULL,
+	.process = process,
 	.panic = panic,
 	.dropped = dropped,
 };
@@ -97,8 +89,8 @@ struct backend_cb backend_ctrl_blk;
 	int _cnt = 0; \
 	test_helpers_log_setup(); \
 	while (!test_helpers_log_dropped_pending()) { \
-		LOG_ERR("test" UTIL_LISTIFY(nargs, TEST_FORMAT_SPEC) \
-				UTIL_LISTIFY(nargs, TEST_VALUE)); \
+		LOG_ERR("test" LISTIFY(nargs, TEST_FORMAT_SPEC, ()) \
+				LISTIFY(nargs, TEST_VALUE, ())); \
 		_cnt++; \
 	} \
 	_cnt--; \
@@ -135,8 +127,8 @@ void test_log_capacity(void)
 	test_helpers_log_setup(); \
 	uint32_t cyc = test_helpers_cycle_get(); \
 	for (int i = 0; i < _msg_cnt; i++) { \
-		LOG_ERR("test" UTIL_LISTIFY(nargs, TEST_FORMAT_SPEC) \
-				UTIL_LISTIFY(nargs, TEST_VALUE)); \
+		LOG_ERR("test" LISTIFY(nargs, TEST_FORMAT_SPEC, ()) \
+				LISTIFY(nargs, TEST_VALUE, ())); \
 	} \
 	cyc = test_helpers_cycle_get() - cyc; \
 	inc_time += cyc; \
@@ -164,7 +156,7 @@ void test_log_message_store_time_no_overwrite(void)
 
 	uint32_t total_us = k_cyc_to_us_ceil32(total_cyc);
 
-	PRINT("%sAvarage logging a message:  %u cycles (%u us)\n",
+	PRINT("%sAverage logging a message:  %u cycles (%u us)\n",
 		k_is_user_context() ? "USERSPACE: " : "",
 		total_cyc / total_msg, total_us / total_msg);
 }
@@ -175,8 +167,8 @@ void test_log_message_store_time_no_overwrite(void)
 	TEST_LOG_CAPACITY(nargs, _dummy, 0); \
 	uint32_t cyc = test_helpers_cycle_get(); \
 	for (int i = 0; i < _msg_cnt; i++) { \
-		LOG_ERR("test" UTIL_LISTIFY(nargs, TEST_FORMAT_SPEC) \
-				UTIL_LISTIFY(nargs, TEST_VALUE)); \
+		LOG_ERR("test" LISTIFY(nargs, TEST_FORMAT_SPEC, ()) \
+				LISTIFY(nargs, TEST_VALUE, ())); \
 	} \
 	cyc = test_helpers_cycle_get() - cyc; \
 	inc_time += cyc; \
@@ -204,7 +196,7 @@ void test_log_message_store_time_overwrite(void)
 
 	uint32_t total_us = k_cyc_to_us_ceil32(total_cyc);
 
-	PRINT("Avarage overwrite logging a message:  %u cycles (%u us)\n",
+	PRINT("Average overwrite logging a message:  %u cycles (%u us)\n",
 		total_cyc / total_msg, total_us / total_msg);
 }
 
@@ -241,12 +233,9 @@ void test_log_message_with_string(void)
 void test_main(void)
 {
 	PRINT("LOGGING MODE:%s\n", IS_ENABLED(CONFIG_LOG_MODE_DEFERRED) ? "DEFERRED" : "IMMEDIATE");
-	PRINT("VERSION:v%d\n", IS_ENABLED(CONFIG_LOG1) ? 1 : 2);
 	PRINT("\tOVERWRITE: %d\n", IS_ENABLED(CONFIG_LOG_MODE_OVERFLOW));
 	PRINT("\tBUFFER_SIZE: %d\n", CONFIG_LOG_BUFFER_SIZE);
-	if (!IS_ENABLED(CONFIG_LOG1)) {
-		PRINT("\tSPEED: %d", IS_ENABLED(CONFIG_LOG_SPEED));
-	}
+	PRINT("\tSPEED: %d", IS_ENABLED(CONFIG_LOG_SPEED));
 	ztest_test_suite(test_log_benchmark,
 			 ztest_unit_test(test_log_capacity),
 			 ztest_unit_test(test_log_message_store_time_no_overwrite),
