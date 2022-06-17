@@ -54,111 +54,26 @@ void debug_init(void)
 	GPIO_InitTypeDef  GPIO_InitStructure;
     USART_InitTypeDef USART_InitStructure;
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, 1);
+    // RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, 1);
 
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-	USART_InitStructure.USART_BaudRate = 115200;
-    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-    USART_InitStructure.USART_StopBits = USART_StopBits_1;
-    USART_InitStructure.USART_Parity = USART_Parity_No;
-    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-    USART_InitStructure.USART_Mode = USART_Mode_Tx;
+	// USART_InitStructure.USART_BaudRate = 115200;
+    // USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    // USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    // USART_InitStructure.USART_Parity = USART_Parity_No;
+    // USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    // USART_InitStructure.USART_Mode = USART_Mode_Tx;
 
-    USART_Init(USART1, &USART_InitStructure);
-    USART_Cmd(USART1, 1);
+    // USART_Init(USART1, &USART_InitStructure);
+    // USART_Cmd(USART1, 1);
 }
 
 
-void put_char(const char ch)
-{
-	USART_SendData(USART1, ch);
-}
 
-void printch(const char ch)   //输出字符
-{  
-    put_char(ch);  
-}  
- 
- 
-void printint(const int dec)     //输出整型数
-{  
-    if(dec == 0)  
-    {  
-        return;  
-    }  
-    printint(dec / 10);  
-    put_char((char)(dec % 10 + '0'));  
-}  
- 
- 
-void printstr(const char *ptr)        //输出字符串
-{  
-    while(*ptr)  
-    {  
-        put_char(*ptr);  
-        ptr++;  
-    }  
-}  
-
-
-void my_printf(const char *format,...)  
-{  
-    va_list ap;  
-    va_start(ap,format);     //将ap指向第一个实际参数的地址
-    while(*format)  
-    {  
-        if(*format != '%')  
-        {  
-            put_char(*format);  
-            format++;  
-        }  
-        else  
-        {  
-            format++;  
-            switch(*format)  
-            {  
-                case 'c':  
-                {  
-                    char valch = va_arg(ap,int);  //记录当前实践参数所在地址
-                    printch(valch);  
-                    format++;  
-                    break;  
-                }  
-                case 'd':  
-                {  
-                    int valint = va_arg(ap,int);  
-                    printint(valint);  
-                    format++;  
-                    break;  
-                }  
-                case 's':  
-                {  
-                    char *valstr = va_arg(ap,char *);  
-                    printstr(valstr);  
-                    format++;  
-                    break;  
-                }  
-                // case 'f':  
-                // {  
-                //     float valflt = va_arg(ap,double);  
-                //     printfloat(valflt);  
-                //     format++;  
-                //     break;  
-                // }  
-                default:  
-                {  
-                    printch(*format);  
-                    format++;  
-                }  
-            }    
-        }  
-    }
-    va_end(ap);         
-}
 
 
 
@@ -179,16 +94,41 @@ void main(void)
 	error(2);
 	delay(1000 * 1000 * 10);
 
+
+extern uint32_t pinmux_fun[2];
+extern uint8_t pincnt;
+extern uint32_t pinmux[2];
+
+extern uint16_t pinnn;
+extern int mmode;
+extern int oospeed;
+extern uint32_t *port;
+
+extern int pincfg;
+extern int ping2;
+extern int function;
+
+	printk("pincnt: %d\n", pincnt);
+	printk("pinmux fun: %#x %#x\n", pinmux_fun[0], pinmux_fun[1]);
+	printk("pinmux: %#lx %#lx\n", pinmux[0], pinmux[1]);
+
+	printk("pincfg: %#lx\n", pincfg);
+	printk("ping2: %#lx\n", ping2);
+	printk("function: %#lx\n", function);
+
+	printk("cfg pin: %#lx\n", pinnn);
+	printk("cfg mode: %lx\n", mmode);
+	printk("cfg speed: %lx\n", oospeed);
+	printk("cfg port: %lx\n", port);
+
+
 	while(1){
-		// USART_SendData(USART1, 0x55);
 		error(1);
 		printk("hello\n");
 	}
 
 	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
 	error(2);
-
-
 
 
 	if (ret < 0) {

@@ -124,7 +124,19 @@ static inline int clock_control_on(const struct device *dev,
 	const struct clock_control_driver_api *api =
 		(const struct clock_control_driver_api *)dev->api;
 
-	return api->on(dev, sys);
+
+	// return api->on(dev, sys);
+
+
+	int ret = api->on(dev, sys);
+
+	// while(1){
+	// 	error(2);
+	// }
+
+	// return ret;
+
+	return 0;
 }
 
 /**

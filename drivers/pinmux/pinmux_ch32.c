@@ -10,6 +10,8 @@
  * A common driver for CH32 pinmux.
  */
 
+// #define DT_DRV_COMPAT wch_ch32_pinmux
+
 #include <errno.h>
 
 #include <kernel.h>
@@ -17,9 +19,9 @@
 #include <soc.h>
 
 #include <drivers/pinmux.h>
-#include <gpio/gpio_ch32.h>
+#include <drivers/gpio/gpio_ch32.h>
 #include <drivers/clock_control/ch32_clock_control.h>
-#include <pinmux/pinmux_ch32.h>
+#include "pinmux_ch32.h"
 
 const struct device * const gpio_ports[CH32_PORTS_MAX] = {
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpioa)),
@@ -27,12 +29,6 @@ const struct device * const gpio_ports[CH32_PORTS_MAX] = {
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpioc)),
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpiod)),
 	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpioe)),
-	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpiof)),
-	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpiog)),
-	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpioh)),
-	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpioi)),
-	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpioj)),
-	DEVICE_DT_GET_OR_NULL(DT_NODELABEL(gpiok)),
 };
 
 static int ch32_pin_configure(uint32_t pin, uint32_t func, uint32_t altf)

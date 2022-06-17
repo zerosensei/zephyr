@@ -52,6 +52,7 @@
 #define CH32_ANALOG  0x10
 #define CH32_GPIO    0x11
 
+
 /**
  * @brief Macro to generate pinmux int using port, pin number and mode arguments
  * This is inspired from Linux equivalent st,stm32f429-pinctrl binding
@@ -100,36 +101,72 @@
 /* GPIO Mode */
 #define CH32_MODER_INPUT_MODE		(0x0 << CH32_MODER_SHIFT)
 #define CH32_MODER_OUTPUT_MODE		(0x1 << CH32_MODER_SHIFT)
-#define CH32_MODER_ALT_MODE		(0x2 << CH32_MODER_SHIFT)
+#define CH32_MODER_ALT_MODE			(0x2 << CH32_MODER_SHIFT)
 #define CH32_MODER_ANALOG_MODE		(0x3 << CH32_MODER_SHIFT)
-#define CH32_MODER_MASK	 	0x3
-#define CH32_MODER_SHIFT		4
+#define CH32_MODER_MASK	 			0x3
+#define CH32_MODER_SHIFT			4
 
 /* GPIO Output type */
 #define CH32_OTYPER_PUSH_PULL		(0x0 << CH32_OTYPER_SHIFT)
 #define CH32_OTYPER_OPEN_DRAIN		(0x1 << CH32_OTYPER_SHIFT)
-#define CH32_OTYPER_MASK		0x1
-#define CH32_OTYPER_SHIFT		6
+#define CH32_OTYPER_MASK			0x1
+#define CH32_OTYPER_SHIFT			6
 
 /* GPIO speed */
 #define CH32_OSPEEDR_LOW_SPEED		(0x0 << CH32_OSPEEDR_SHIFT)
 #define CH32_OSPEEDR_MEDIUM_SPEED	(0x1 << CH32_OSPEEDR_SHIFT)
-#define CH32_OSPEEDR_HIGH_SPEED	(0x2 << CH32_OSPEEDR_SHIFT)
+#define CH32_OSPEEDR_HIGH_SPEED		(0x2 << CH32_OSPEEDR_SHIFT)
 #define CH32_OSPEEDR_VERY_HIGH_SPEED	(0x3 << CH32_OSPEEDR_SHIFT)
-#define CH32_OSPEEDR_MASK		0x3
-#define CH32_OSPEEDR_SHIFT		7
+#define CH32_OSPEEDR_MASK			0x3
+#define CH32_OSPEEDR_SHIFT			7
 
 /* GPIO High impedance/Pull-up/pull-down */
-#define CH32_PUPDR_NO_PULL		(0x0 << CH32_PUPDR_SHIFT)
-#define CH32_PUPDR_PULL_UP		(0x1 << CH32_PUPDR_SHIFT)
+#define CH32_PUPDR_NO_PULL			(0x0 << CH32_PUPDR_SHIFT)
+#define CH32_PUPDR_PULL_UP			(0x1 << CH32_PUPDR_SHIFT)
 #define CH32_PUPDR_PULL_DOWN		(0x2 << CH32_PUPDR_SHIFT)
-#define CH32_PUPDR_MASK		0x3
-#define CH32_PUPDR_SHIFT		9
+#define CH32_PUPDR_MASK				0x3
+#define CH32_PUPDR_SHIFT			9
 
 /* GPIO plain output value */
-#define CH32_ODR_0			(0x0 << CH32_ODR_SHIFT)
-#define CH32_ODR_1			(0x1 << CH32_ODR_SHIFT)
-#define CH32_ODR_MASK			0x1
-#define CH32_ODR_SHIFT			11
+#define CH32_ODR_0					(0x0 << CH32_ODR_SHIFT)
+#define CH32_ODR_1					(0x1 << CH32_ODR_SHIFT)
+#define CH32_ODR_MASK				0x1
+#define CH32_ODR_SHIFT				11
+
+/**
+ * @brief helper to extract IO port number from CH32_PINMUX() encoded
+ * value
+ */
+#define CH32_DT_PINMUX_PORT(__pin) \
+	(((__pin) >> CH32_PORT_SHIFT) & CH32_PORT_MASK)
+
+/**
+ * @brief helper to extract IO pin number from CH32_PINMUX() encoded
+ * value
+ */
+#define CH32_DT_PINMUX_LINE(__pin) \
+	(((__pin) >> CH32_LINE_SHIFT) & CH32_LINE_MASK)
+
+/**
+ * @brief helper to extract IO pin func from CH32_PINMUX() encoded
+ * value
+ */
+#define CH32_DT_PINMUX_FUNC(__pin) \
+	(((__pin) >> CH32_MODE_SHIFT) & CH32_MODE_MASK)
+
+
+/**
+ * @brief helper to extract IO port number from CH32PIN() encoded
+ * value
+ */
+#define CH32_PORT(__pin) \
+	((__pin) >> 4)
+
+/**
+ * @brief helper to extract IO pin number from CH32PIN() encoded
+ * value
+ */
+#define CH32_PIN(__pin) \
+	((__pin) & 0xf)
 
 #endif /* ZEPHYR_INCLUDE_DT_BINDINGS_PINCTRL_CH32_PINCTRL_H */

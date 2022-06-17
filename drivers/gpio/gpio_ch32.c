@@ -11,26 +11,22 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/ch32-pinctrl.h>
 #include "gpio_utils.h"
+#include <drivers/gpio/gpio_ch32.h>
 #include <ch32v30x.h>
 
-struct gpio_ch32_data {
-	/* gpio_driver_data needs to be first */
-	struct gpio_driver_data common;
+/**
+ * @brief Common GPIO driver for CH32 MCUs.
+ */
 
-	const struct device *dev;
+/**
+ * @brief EXTI interrupt callback
+ */
+static void gpio_ch32_isr(int line, void *arg)
+{
+	struct gpio_ch32_data *data = arg;
 
-	sys_slist_t callbacks;
-};
-
-struct gpio_ch32_cfg {
-	/* gpio_driver_config needs to be first */
-	struct gpio_driver_config common;
-	/* port base address */
-	uint32_t *base;
-	/* IO port */
-	int port;
-	struct ch32_pclken pclken;
-};
+	gpio_fire_callbacks(&data->cb, data->dev, BIT(line));
+}
 
 /**
  * @brief Common gpio flags to custom flags
@@ -83,12 +79,62 @@ static inline uint32_t ch32_pinval_get(int pin)
 	return pinval;
 }
 
+
+uint16_t pinnn;
+int mmode;
+int oospeed;
+uint32_t *port;
+
+/**
+ * @brief Configure the hardware.
+ */
+static void gpio_ch32_configure_raw(const struct device *dev, int pin,
+				     int conf, int func)
+{
+	const struct gpio_ch32_cfg *cfg = dev->config;
+	GPIO_TypeDef *gpio = (GPIO_TypeDef *)cfg->base;
+
+	port = (uint32_t *)gpio;
+
+	uint16_t pin_ll = ch32_pinval_get(pin);
+
+	unsigned int mode, otype, ospeed, pupd;
+
+	mode = conf & (CH32_MODER_MASK << CH32_MODER_SHIFT);
+	otype = conf & (CH32_OTYPER_MASK << CH32_OTYPER_SHIFT);
+	ospeed = conf & (CH32_OSPEEDR_MASK << CH32_OSPEEDR_SHIFT);
+	pupd = conf & (CH32_PUPDR_MASK << CH32_PUPDR_SHIFT);
+
+	if(mode == CH32_MODER_ALT_MODE) {
+		
+	}
+
+	GPIO_InitTypeDef GPIO_InitStructure = {0};
+
+	GPIO_InitStructure.GPIO_Pin = pin_ll;
+	GPIO_InitStructure.GPIO_Mode = mode;
+	GPIO_InitStructure.GPIO_Speed = ospeed;
+	GPIO_Init(gpio, &GPIO_InitStructure);
+
+
+
+	pinnn = pin_ll;
+	mmode = mode;
+	oospeed = ospeed;
+
+
+}
+
+
+
+
 static int gpio_ch32_pin_configure(const struct device *port, gpio_pin_t pin, 
 					gpio_flags_t flags)
 {
 	const struct gpio_ch32_cfg *cfg = port->config;
 	GPIO_TypeDef *gpio = (GPIO_TypeDef *)cfg->base;
 	int pincfg = GPIO_Mode_AIN;
+
 
 	gpio_ch32_flags_to_conf(flags, &pincfg);
 
@@ -177,6 +223,51 @@ static int gpio_ch32_port_toggle_bits(const struct device *dev,
 	return 0;
 }
 
+
+int pincfg;
+int ping2;
+int function;
+
+int gpio_ch32_configure(const struct device *dev, int pin, int conf, int func)
+{
+
+	pincfg = conf;
+	ping2 = pin;
+	function = func;
+
+	const struct gpio_ch32_cfg *cfg = dev->config;
+
+	switch (cfg->pclken.bus) {
+	case CH32_CLOCK_BUS_AHB:
+		RCC_AHBPeriphClockCmd(cfg->pclken.enr, 1);
+		break;
+
+	case CH32_CLOCK_BUS_APB1:
+		RCC_APB1PeriphClockCmd(cfg->pclken.enr, 1);
+		break;
+
+	case CH32_CLOCK_BUS_APB2:
+		RCC_APB2PeriphClockCmd(cfg->pclken.enr, 1);
+		break;
+
+	default:
+		return -ENOTSUP;
+	}
+
+	gpio_ch32_configure_raw(dev, pin, conf, func);
+
+	if (func == CH32_GPIO) {
+		uint32_t gpio_out = conf & (CH32_ODR_MASK << CH32_ODR_SHIFT);
+
+		if (gpio_out == CH32_ODR_1) {
+			gpio_ch32_port_set_bits_raw(dev, BIT(pin));
+		} else if (gpio_out == CH32_ODR_0) {
+			gpio_ch32_port_clear_bits_raw(dev, BIT(pin));
+		}
+	}
+
+	return 0;
+}
 
 static const struct gpio_driver_api gpio_ch32_driver = {
 	.pin_configure = gpio_ch32_pin_configure,

@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
+#define DT_DRV_COMPAT wch_ch32_clock
 
 #include "soc.h"
 #include <drivers/clock_control.h>
@@ -37,12 +37,22 @@
 // 	return clock / prescaler;
 // }
 
+uint32_t clk;
+extern void error(uint32_t t);
+uint32_t bus1 ;
+uint32_t enr1 ;
+
 static inline int ch32_clock_control_on(const struct device *dev, 
 					clock_control_subsys_t sub_system)
 {
 	struct ch32_pclken *pclken = (struct ch32_pclken *)(sub_system);
 
 	ARG_UNUSED(dev);
+
+
+	bus1 = pclken->bus;
+	enr1 = pclken->enr;
+
 
 	switch (pclken->bus) {
 	case CH32_CLOCK_BUS_AHB:
@@ -64,12 +74,14 @@ static inline int ch32_clock_control_on(const struct device *dev,
 	return 0;
 }
 
+
 static inline int ch32_clock_control_off(const struct device *dev,
 					  clock_control_subsys_t sub_system)
 {
 	struct ch32_pclken *pclken = (struct ch32_pclken *)(sub_system);
 
 	ARG_UNUSED(dev);
+
 
 	switch (pclken->bus) {
 	case CH32_CLOCK_BUS_AHB:

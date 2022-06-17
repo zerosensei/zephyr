@@ -21,4 +21,8 @@ config GPIO_CH32
 
 endif # GPIO
 
+config PINMUX_CH32
+	default y
+	depends on PINMUX
+
 endif # SOC_SERIES_CH32V

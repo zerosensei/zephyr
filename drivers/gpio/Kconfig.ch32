@@ -5,6 +5,6 @@
 
 config GPIO_CH32
 	bool "GPIO Driver for CH32 family of MCUs"
-	depends on SOC_FAMILY_CH32
+	# depends on SOC_FAMILY_CH32
 	help
 	  Enable GPIO driver for CH32 line of MCUs

@@ -240,11 +240,27 @@ static void usart_ch32_irq_callback_set(const struct device *dev
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
 
 
+extern void debug_init(void);
+extern void error(uint32_t t);
+extern void delay(uint32_t t);
+
+uint32_t *temp;
+
 static int usart_ch32_init(const struct device *dev)
 {
 	const struct usart_ch32_config *config = dev->config;
 	struct usart_ch32_data *data = dev->data;
 	int err;
+
+
+	debug_init();
+
+	temp = (uint32_t *)config->usart;
+
+	// while(1) {
+	// 	error(1); 
+	// }
+
 	USART_InitTypeDef USART_InitStructure = {0};
 
 	data->clock = DEVICE_DT_GET(CH32_CLOCK_CONTROL_NODE);
@@ -290,10 +306,6 @@ static int usart_ch32_init(const struct device *dev)
 #ifdef CONFIG_UART_INTERRUPT_DRIVEN
 	config->irq_config_func(dev);
 #endif /* CONFIG_UART_INTERRUPT_DRIVEN */
-
-	// while(1){
-		// error(2);
-	// }
 
 	return 0;
 }
