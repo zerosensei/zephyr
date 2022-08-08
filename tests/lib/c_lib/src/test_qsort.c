@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define _GNU_SOURCE
 #include <stdbool.h>
 #include <stdlib.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 static int compare_ints(const void *a, const void *b)
 {

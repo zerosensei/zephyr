@@ -7,7 +7,7 @@
 /dts-v1/;
 #include <st/g0/stm32g071Xb.dtsi>
 #include <st/g0/stm32g071r(6-8-b)tx-pinctrl.dtsi>
-#include <dt-bindings/sensor/ina230.h>
+#include <zephyr/dt-bindings/sensor/ina230.h>
 
 / {
 	model = "STM32G071B DEMO board";
@@ -92,6 +92,7 @@
 		sw2 = &joy_down;
 		sw3 = &joy_right;
 		sw4 = &joy_up;
+		watchdog0 = &iwdg;
 	};
 };
 
@@ -136,7 +137,6 @@
 	vbus_meas: ina230@40 {
 		status = "okay";
 		compatible = "ti,ina230";
-		label = "VBUS";
 		reg = <0x40>;
 		config = <INA230_CONFIG(
 			INA230_OPER_MODE_BUS_VOLTAGE_CONT,

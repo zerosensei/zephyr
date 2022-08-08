@@ -11,28 +11,28 @@
 #define LOG_MODULE_NAME ieee802154_cc1200
 #define LOG_LEVEL CONFIG_IEEE802154_DRIVER_LOG_LEVEL
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <errno.h>
 
-#include <kernel.h>
-#include <arch/cpu.h>
-#include <debug/stack.h>
+#include <zephyr/kernel.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/debug/stack.h>
 
-#include <device.h>
-#include <init.h>
-#include <net/net_if.h>
-#include <net/net_pkt.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/net_pkt.h>
 
-#include <sys/byteorder.h>
+#include <zephyr/sys/byteorder.h>
 #include <string.h>
-#include <random/rand32.h>
+#include <zephyr/random/rand32.h>
 
-#include <drivers/spi.h>
-#include <drivers/gpio.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/gpio.h>
 
-#include <net/ieee802154_radio.h>
+#include <zephyr/net/ieee802154_radio.h>
 
 #include "ieee802154_cc1200.h"
 #include "ieee802154_cc1200_rf.h"
@@ -801,9 +801,7 @@ static struct ieee802154_radio_api cc1200_radio_api = {
 	.get_subg_channel_count = cc1200_get_channel_count,
 };
 
-NET_DEVICE_INIT(cc1200, CONFIG_IEEE802154_CC1200_DRV_NAME,
-		cc1200_init, NULL,
-		&cc1200_context_data, &cc1200_config,
-		CONFIG_IEEE802154_CC1200_INIT_PRIO,
-		&cc1200_radio_api, IEEE802154_L2,
-		NET_L2_GET_CTX_TYPE(IEEE802154_L2), 125);
+NET_DEVICE_DT_INST_DEFINE(0, cc1200_init, NULL, &cc1200_context_data,
+			  &cc1200_config, CONFIG_IEEE802154_CC1200_INIT_PRIO,
+			  &cc1200_radio_api, IEEE802154_L2,
+			  NET_L2_GET_CTX_TYPE(IEEE802154_L2), 125);

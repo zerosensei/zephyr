@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <ztest.h>
-#include <linker/linker-defs.h>
-#include <sys/mem_manage.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/ztest.h>
+#include <zephyr/linker/linker-defs.h>
+#include <zephyr/sys/mem_manage.h>
 
-#include <multi_heap/shared_multi_heap.h>
+#include <zephyr/multi_heap/shared_multi_heap.h>
 
 #define DT_DRV_COMPAT		zephyr_memory_region
 
@@ -130,7 +130,7 @@ static void fill_multi_heap(void)
 	}
 }
 
-void test_shared_multi_heap(void)
+ZTEST(shared_multi_heap, test_shared_multi_heap)
 {
 	struct region_map *reg_map;
 	void *block;
@@ -213,9 +213,4 @@ void test_shared_multi_heap(void)
 	zassert_is_null(block, "wrong attribute accepted as valid");
 }
 
-void test_main(void)
-{
-	ztest_test_suite(shared_multi_heap,
-			 ztest_1cpu_unit_test(test_shared_multi_heap));
-	ztest_run_test_suite(shared_multi_heap);
-}
+ZTEST_SUITE(shared_multi_heap, NULL, NULL, NULL, NULL, NULL);

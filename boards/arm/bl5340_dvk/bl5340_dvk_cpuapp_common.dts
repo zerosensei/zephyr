@@ -84,6 +84,11 @@
 		sw1 = &button2;
 		sw2 = &button3;
 		sw3 = &button4;
+		mcuboot-button0 = &button1;
+		mcuboot-led0 = &led1;
+		sdhc0 = &sdhc0;
+		watchdog0 = &wdt0;
+		accel0 = &lis3dh;
 	};
 };
 
@@ -120,7 +125,7 @@
 		timeout = <10>;
 	};
 
-	lis3dh@18 {
+	lis3dh: lis3dh@18 {
 		compatible = "st,lis2dh";
 		label = "LIS3DH";
 		reg = <0x18>;
@@ -189,12 +194,15 @@
 	pinctrl-0 = <&spi3_default>;
 	pinctrl-1 = <&spi3_sleep>;
 	pinctrl-names = "default", "sleep";
-	sdhc@0 {
-		compatible = "zephyr,mmc-spi-slot";
+	sdhc0: sdhc@0 {
 		reg = <0>;
+		compatible = "zephyr,sdhc-spi-slot";
 		status = "okay";
-		label = "SDHC";
 		spi-max-frequency = <8000000>;
+		mmc {
+			compatible = "zephyr,sdmmc-disk";
+			status = "okay";
+		};
 	};
 };
 
@@ -332,7 +340,7 @@
 		/* 7MB */
 		lfs_partition: partition@100000 {
 			label = "lfs_storage";
-			reg = <0x00100000 0x000700000>;
+			reg = <0x00100000 0x00700000>;
 		};
 	};
 };

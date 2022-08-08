@@ -11,13 +11,17 @@
 #include <stm32_ll_rcc.h>
 #include <stm32_ll_system.h>
 #include <stm32_ll_utils.h>
-#include <drivers/clock_control.h>
-#include <sys/util.h>
-#include <sys/__assert.h>
-#include <drivers/clock_control/stm32_clock_control.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/drivers/clock_control/stm32_clock_control.h>
 #include "clock_stm32_ll_common.h"
+#include "stm32_hsem.h"
 
 /* Macros to fill up prescaler values */
+#define z_hsi_divider(v) LL_RCC_HSI_DIV_ ## v
+#define hsi_divider(v) z_hsi_divider(v)
+
 #define fn_ahb_prescaler(v) LL_RCC_SYSCLK_DIV_ ## v
 #define ahb_prescaler(v) fn_ahb_prescaler(v)
 
@@ -35,16 +39,6 @@
 #define fn_mco2_prescaler(v) LL_RCC_MCO2_DIV_ ## v
 #define mco2_prescaler(v) fn_mco2_prescaler(v)
 
-/* Calculate MSI freq for the given range (at RUN range, not after standby) */
-#if !defined(LL_RCC_MSIRANGESEL_RUN)
-/* CONFIG_SOC_SERIES_STM32WBX or CONFIG_SOC_SERIES_STM32L0X or CONFIG_SOC_SERIES_STM32L1X */
-#define RCC_CALC_MSI_RUN_FREQ() __LL_RCC_CALC_MSI_FREQ(LL_RCC_MSI_GetRange())
-#else
-/* mainly CONFIG_SOC_SERIES_STM32WLX or CONFIG_SOC_SERIES_STM32L4X or CONFIG_SOC_SERIES_STM32L5X */
-#define RCC_CALC_MSI_RUN_FREQ() __LL_RCC_CALC_MSI_FREQ( \
-			LL_RCC_MSIRANGESEL_RUN, LL_RCC_MSI_GetRange())
-#endif
-
 #if DT_NODE_HAS_PROP(DT_NODELABEL(rcc), ahb4_prescaler)
 #define RCC_CALC_FLASH_FREQ __LL_RCC_CALC_HCLK4_FREQ
 #define GET_CURRENT_FLASH_PRESCALER LL_RCC_GetAHB4Prescaler
@@ -56,14 +50,134 @@
 #define GET_CURRENT_FLASH_PRESCALER LL_RCC_GetAHBPrescaler
 #endif
 
-/* Identify stm32wl dual-core socs by symbol defined in CMSIS dev header file */
-#if (defined(CONFIG_SOC_SERIES_STM32WLX) && defined(DUAL_CORE))
-#define STM32WL_DUAL_CORE
-#endif
+#if defined(RCC_PLLCFGR_PLLPEN)
+#define RCC_PLLP_ENABLE() SET_BIT(RCC->PLLCFGR, RCC_PLLCFGR_PLLPEN)
+#else
+#define RCC_PLLP_ENABLE()
+#endif /* RCC_PLLCFGR_PLLPEN */
+#if defined(RCC_PLLCFGR_PLLQEN)
+#define RCC_PLLQ_ENABLE() SET_BIT(RCC->PLLCFGR, RCC_PLLCFGR_PLLQEN)
+#else
+#define RCC_PLLQ_ENABLE()
+#endif /* RCC_PLLCFGR_PLLQEN */
+
+/**
+ * @brief Return frequency for pll with 2 dividers and a multiplier
+ */
+__unused
+static uint32_t get_pll_div_frequency(uint32_t pllsrc_freq,
+				      int pllm_div,
+				      int plln_mul,
+				      int pllout_div)
+{
+	__ASSERT_NO_MSG(pllm_div && pllout_div);
+
+	return (pllsrc_freq * plln_mul) /
+		(pllm_div * pllout_div);
+}
 
 static uint32_t get_bus_clock(uint32_t clock, uint32_t prescaler)
 {
 	return clock / prescaler;
+}
+
+__unused
+static uint32_t get_msi_frequency(void)
+{
+#if defined(STM32_MSI_ENABLED)
+#if !defined(LL_RCC_MSIRANGESEL_RUN)
+	return __LL_RCC_CALC_MSI_FREQ(LL_RCC_MSI_GetRange());
+#else
+	return __LL_RCC_CALC_MSI_FREQ(LL_RCC_MSIRANGESEL_RUN,
+				      LL_RCC_MSI_GetRange());
+#endif
+#endif
+	return 0;
+}
+
+/** @brief Verifies clock is part of active clock configuration */
+__unused
+static int enabled_clock(uint32_t src_clk)
+{
+	int r = 0;
+
+	switch (src_clk) {
+#if defined(STM32_SRC_SYSCLK)
+	case STM32_SRC_SYSCLK:
+		break;
+#endif /* STM32_SRC_SYSCLK */
+#if defined(STM32_SRC_PCLK)
+	case STM32_SRC_PCLK:
+		break;
+#endif /* STM32_SRC_PCLK */
+#if defined(STM32_SRC_HSE)
+	case STM32_SRC_HSE:
+		if (!IS_ENABLED(STM32_HSE_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_HSE */
+#if defined(STM32_SRC_HSI)
+	case STM32_SRC_HSI:
+		if (!IS_ENABLED(STM32_HSI_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_HSI */
+#if defined(STM32_SRC_LSE)
+	case STM32_SRC_LSE:
+		if (!IS_ENABLED(STM32_LSE_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_LSE */
+#if defined(STM32_SRC_LSI)
+	case STM32_SRC_LSI:
+		if (!IS_ENABLED(STM32_LSI_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_LSI */
+#if defined(STM32_SRC_MSI)
+	case STM32_SRC_MSI:
+		if (!IS_ENABLED(STM32_MSI_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_MSI */
+#if defined(STM32_SRC_PLLCLK)
+	case STM32_SRC_PLLCLK:
+		if (!IS_ENABLED(STM32_PLL_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_PLLCLK */
+#if defined(STM32_SRC_PLL_P)
+	case STM32_SRC_PLL_P:
+		if (!IS_ENABLED(STM32_PLL_P_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_PLL_P */
+#if defined(STM32_SRC_PLL_Q)
+	case STM32_SRC_PLL_Q:
+		if (!IS_ENABLED(STM32_PLL_Q_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_PLL_Q */
+#if defined(STM32_SRC_PLL_R)
+	case STM32_SRC_PLL_R:
+		if (!IS_ENABLED(STM32_PLL_R_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_PLL_R */
+	default:
+		return -ENOTSUP;
+	}
+
+	return r;
 }
 
 static inline int stm32_clock_control_on(const struct device *dev,
@@ -75,6 +189,11 @@ static inline int stm32_clock_control_on(const struct device *dev,
 
 	ARG_UNUSED(dev);
 
+	if (IN_RANGE(pclken->bus, STM32_PERIPH_BUS_MIN, STM32_PERIPH_BUS_MAX) == 0) {
+		/* Attemp to change a wrong periph clock bit */
+		return -ENOTSUP;
+	}
+
 	reg = (uint32_t *)(DT_REG_ADDR(DT_NODELABEL(rcc)) + pclken->bus);
 	reg_val = *reg;
 	reg_val |= pclken->enr;
@@ -82,7 +201,6 @@ static inline int stm32_clock_control_on(const struct device *dev,
 
 	return 0;
 }
-
 
 static inline int stm32_clock_control_off(const struct device *dev,
 					  clock_control_subsys_t sub_system)
@@ -106,6 +224,40 @@ static inline int stm32_clock_control_off(const struct device *dev,
 	return 0;
 }
 
+static inline int stm32_clock_control_configure(const struct device *dev,
+						clock_control_subsys_t sub_system,
+						void *data)
+{
+#if defined(STM32_SRC_SYSCLK)
+	/* At least one alt src clock available */
+	struct stm32_pclken *pclken = (struct stm32_pclken *)(sub_system);
+	volatile uint32_t *reg;
+	uint32_t reg_val, dt_val;
+	int err;
+
+	ARG_UNUSED(dev);
+	ARG_UNUSED(data);
+
+	err = enabled_clock(pclken->bus);
+	if (err < 0) {
+		/* Attempt to configure a src clock not available or not valid */
+		return err;
+	}
+
+	dt_val = STM32_CLOCK_VAL_GET(pclken->enr) <<
+					STM32_CLOCK_SHIFT_GET(pclken->enr);
+	reg = (uint32_t *)(DT_REG_ADDR(DT_NODELABEL(rcc)) +
+					STM32_CLOCK_REG_GET(pclken->enr));
+	reg_val = *reg;
+	reg_val |= dt_val;
+	*reg = reg_val;
+
+	return 0;
+#else
+	/* No src clock available: Not supported */
+	return -ENOTSUP;
+#endif
+}
 
 static int stm32_clock_control_get_subsys_rate(const struct device *clock,
 						clock_control_subsys_t sub_system,
@@ -132,6 +284,14 @@ static int stm32_clock_control_get_subsys_rate(const struct device *clock,
 #elif defined(STM32_CLOCK_BUS_AHB3)
 	/* AHB3 bus exists, but w/o dedicated prescaler */
 	uint32_t ahb3_clock = ahb_clock;
+#endif
+
+#if defined(STM32_SRC_PCLK)
+	if (pclken->bus == STM32_SRC_PCLK) {
+		/* STM32_SRC_PCLK can't be used to request a subsys freq */
+		/* Use STM32_CLOCK_BUS_FOO instead. */
+		return -ENOTSUP;
+	}
 #endif
 
 	ARG_UNUSED(clock);
@@ -168,6 +328,66 @@ static int stm32_clock_control_get_subsys_rate(const struct device *clock,
 		*rate = ahb3_clock;
 		break;
 #endif
+#if defined(STM32_SRC_SYSCLK)
+	case STM32_SRC_SYSCLK:
+		*rate = SystemCoreClock * STM32_CORE_PRESCALER;
+		break;
+#endif
+#if defined(STM32_SRC_PLLCLK) & defined(STM32_SYSCLK_SRC_PLL)
+	case STM32_SRC_PLLCLK:
+		if (get_pllout_frequency() == 0) {
+			return -EIO;
+		}
+		*rate = get_pllout_frequency();
+		break;
+#endif
+#if defined(STM32_SRC_PLL_P) & STM32_PLL_P_ENABLED
+	case STM32_SRC_PLL_P:
+		*rate = get_pll_div_frequency(get_pllsrc_frequency(),
+					      STM32_PLL_M_DIVISOR,
+					      STM32_PLL_N_MULTIPLIER,
+					      STM32_PLL_P_DIVISOR);
+		break;
+#endif
+#if defined(STM32_SRC_PLL_Q) & STM32_PLL_Q_ENABLED
+	case STM32_SRC_PLL_Q:
+		*rate = get_pll_div_frequency(get_pllsrc_frequency(),
+					      STM32_PLL_M_DIVISOR,
+					      STM32_PLL_N_MULTIPLIER,
+					      STM32_PLL_Q_DIVISOR);
+		break;
+#endif
+#if defined(STM32_SRC_PLL_R) & STM32_PLL_R_ENABLED
+	case STM32_SRC_PLL_R:
+		*rate = get_pll_div_frequency(get_pllsrc_frequency(),
+					      STM32_PLL_M_DIVISOR,
+					      STM32_PLL_N_MULTIPLIER,
+					      STM32_PLL_R_DIVISOR);
+		break;
+#endif
+/* PLLSAI1x not supported yet */
+/* PLLSAI2x not supported yet */
+/* PLLI2Sx not supported yet */
+#if defined(STM32_SRC_LSE)
+	case STM32_SRC_LSE:
+		*rate = STM32_LSE_FREQ;
+		break;
+#endif
+#if defined(STM32_SRC_LSI)
+	case STM32_SRC_LSI:
+		*rate = STM32_LSI_FREQ;
+		break;
+#endif
+#if defined(STM32_SRC_HSI)
+	case STM32_SRC_HSI:
+		*rate = STM32_HSI_FREQ;
+		break;
+#endif
+#if defined(STM32_SRC_HSE)
+	case STM32_SRC_HSE:
+		*rate = STM32_HSE_FREQ;
+		break;
+#endif
 	default:
 		return -ENOTSUP;
 	}
@@ -179,6 +399,7 @@ static struct clock_control_driver_api stm32_clock_control_api = {
 	.on = stm32_clock_control_on,
 	.off = stm32_clock_control_off,
 	.get_rate = stm32_clock_control_get_subsys_rate,
+	.configure = stm32_clock_control_configure,
 };
 
 /*
@@ -220,10 +441,9 @@ static inline void stm32_clock_control_mco_init(void)
 }
 
 __unused
-static int set_up_plls(void)
+static void set_up_plls(void)
 {
 #if defined(STM32_PLL_ENABLED)
-	int r;
 
 	/*
 	 * Case of chain-loaded applications:
@@ -253,16 +473,16 @@ static int set_up_plls(void)
 	}
 #endif
 
-#if STM32_PLL_Q_DIVISOR
-	MODIFY_REG(RCC->PLLCFGR, RCC_PLLCFGR_PLLQ,
-		   STM32_PLL_Q_DIVISOR
-		   << RCC_PLLCFGR_PLLQ_Pos);
+#if defined(STM32_SRC_PLL_P) & STM32_PLL_P_ENABLED
+	MODIFY_REG(RCC->PLLCFGR, RCC_PLLCFGR_PLLP, pllp(STM32_PLL_P_DIVISOR));
+	RCC_PLLP_ENABLE();
+#endif
+#if defined(STM32_SRC_PLL_Q) & STM32_PLL_Q_ENABLED
+	MODIFY_REG(RCC->PLLCFGR, RCC_PLLCFGR_PLLQ, pllq(STM32_PLL_Q_DIVISOR));
+	RCC_PLLQ_ENABLE();
 #endif
 
-	r = config_pll_sysclock();
-	if (r < 0) {
-		return -ENOTSUP;
-	}
+	config_pll_sysclock();
 
 	/* Enable PLL */
 	LL_RCC_PLL_Enable();
@@ -271,8 +491,6 @@ static int set_up_plls(void)
 	}
 
 #endif /* STM32_PLL_ENABLED */
-
-	return 0;
 }
 
 static void set_up_fixed_clock_sources(void)
@@ -309,6 +527,9 @@ static void set_up_fixed_clock_sources(void)
 			/* Wait for HSI ready */
 			}
 		}
+#if STM32_HSI_DIV_ENABLED
+		LL_RCC_SetHSIDiv(hsi_divider(STM32_HSI_DIVISOR));
+#endif
 	}
 
 #if defined(STM32_MSI_ENABLED)
@@ -342,6 +563,44 @@ static void set_up_fixed_clock_sources(void)
 	}
 #endif /* STM32_MSI_ENABLED */
 
+	if (IS_ENABLED(STM32_LSI_ENABLED)) {
+#if defined(CONFIG_SOC_SERIES_STM32WBX)
+		LL_RCC_LSI1_Enable();
+		while (LL_RCC_LSI1_IsReady() != 1) {
+		}
+#else
+		LL_RCC_LSI_Enable();
+		while (LL_RCC_LSI_IsReady() != 1) {
+		}
+#endif
+	}
+
+	if (IS_ENABLED(STM32_LSE_ENABLED)) {
+		/* LSE belongs to the back-up domain, enable access.*/
+
+		z_stm32_hsem_lock(CFG_HW_RCC_SEMID, HSEM_LOCK_DEFAULT_RETRY);
+
+		/* Set the DBP bit in the Power control register 1 (PWR_CR1) */
+		LL_PWR_EnableBkUpAccess();
+		while (!LL_PWR_IsEnabledBkUpAccess()) {
+			/* Wait for Backup domain access */
+		}
+
+#if STM32_LSE_DRIVING
+		/* Configure driving capability */
+		LL_RCC_LSE_SetDriveCapability(STM32_LSE_DRIVING << RCC_BDCR_LSEDRV_Pos);
+#endif
+
+		/* Enable LSE Oscillator (32.768 kHz) */
+		LL_RCC_LSE_Enable();
+		while (!LL_RCC_LSE_IsReady()) {
+			/* Wait for LSE ready */
+		}
+
+		LL_PWR_DisableBkUpAccess();
+
+		z_stm32_hsem_unlock(CFG_HW_RCC_SEMID);
+	}
 }
 
 /**
@@ -358,8 +617,6 @@ static void set_up_fixed_clock_sources(void)
  */
 int stm32_clock_control_init(const struct device *dev)
 {
-	int r;
-
 	ARG_UNUSED(dev);
 
 	/* Some clocks would be activated by default */
@@ -385,10 +642,7 @@ int stm32_clock_control_init(const struct device *dev)
 	set_up_fixed_clock_sources();
 
 	/* Set up PLLs */
-	r = set_up_plls();
-	if (r < 0) {
-		return r;
-	}
+	set_up_plls();
 
 	if (DT_PROP(DT_NODELABEL(rcc), undershoot_prevention) &&
 		(STM32_CORE_PRESCALER == LL_RCC_SYSCLK_DIV_1) &&

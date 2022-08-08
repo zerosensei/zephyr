@@ -4,20 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <device.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/device.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <drivers/ipm.h>
+#include <zephyr/drivers/ipm.h>
 
 #include <openamp/open_amp.h>
 #include <metal/device.h>
 #include <resource_table.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(openamp_rsc_table, LOG_LEVEL_DBG);
 
 #define SHM_DEVICE_NAME	"shm"
@@ -191,9 +191,9 @@ int platform_init(void)
 	}
 
 	/* setup IPM */
-	ipm_handle = device_get_binding(CONFIG_OPENAMP_IPC_DEV_NAME);
-	if (!ipm_handle) {
-		LOG_DBG("Failed to find ipm device\n");
+	ipm_handle = DEVICE_DT_GET(DT_CHOSEN(zephyr_ipc));
+	if (!device_is_ready(ipm_handle)) {
+		LOG_DBG("IPM device is not ready\n");
 		return -1;
 	}
 
@@ -225,7 +225,7 @@ platform_create_rpmsg_vdev(unsigned int vdev_index,
 	struct virtio_device *vdev;
 	int ret;
 
-	vdev = rproc_virtio_create_vdev(VIRTIO_DEV_SLAVE, VDEV_ID,
+	vdev = rproc_virtio_create_vdev(VIRTIO_DEV_DEVICE, VDEV_ID,
 					rsc_table_to_vdev(rsc_table),
 					rsc_io, NULL, mailbox_notify, NULL);
 
@@ -349,7 +349,7 @@ void rpmsg_mng_task(void *arg1, void *arg2, void *arg3)
 		goto task_end;
 	}
 
-	rpdev = platform_create_rpmsg_vdev(0, VIRTIO_DEV_SLAVE, NULL,
+	rpdev = platform_create_rpmsg_vdev(0, VIRTIO_DEV_DEVICE, NULL,
 					   new_service_cb);
 	if (!rpdev) {
 		LOG_ERR("Failed to create rpmsg virtio device\n");

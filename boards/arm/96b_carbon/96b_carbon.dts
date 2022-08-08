@@ -124,7 +124,6 @@
 		reset-gpios = <&gpiob 4 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
 		irq-gpios = <&gpiob 1 GPIO_ACTIVE_HIGH>;
 		spi-max-frequency = <2000000>;
-		label = "BT_HCI";
 	};
 };
 
@@ -150,7 +149,7 @@ zephyr_udc0: &usbotg_fs {
 
 		boot_partition: partition@0 {
 			label = "mcuboot";
-			reg = <0x00000000 0x00008000>;
+			reg = <0x00000000 DT_SIZE_K(32)>;
 			read-only;
 		};
 
@@ -162,15 +161,15 @@ zephyr_udc0: &usbotg_fs {
 
 		slot0_partition: partition@20000 {
 			label = "image-0";
-			reg = <0x00020000 0x00020000>;
+			reg = <0x00020000 DT_SIZE_K(128)>;
 		};
 		slot1_partition: partition@40000 {
 			label = "image-1";
-			reg = <0x00040000 0x00020000>;
+			reg = <0x00040000 DT_SIZE_K(128)>;
 		};
 		scratch_partition: partition@60000 {
 			label = "image-scratch";
-			reg = <0x00060000 0x00020000>;
+			reg = <0x00060000 DT_SIZE_K(128)>;
 		};
 	};
 };

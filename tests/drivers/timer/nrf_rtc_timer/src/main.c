@@ -3,11 +3,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <ztest.h>
-#include <drivers/timer/nrf_rtc_timer.h>
+#include <zephyr/ztest.h>
+#include <zephyr/drivers/timer/nrf_rtc_timer.h>
 #include <hal/nrf_rtc.h>
 #include <hal/nrf_timer.h>
-#include <irq.h>
+#include <zephyr/irq.h>
 
 struct test_data {
 	uint64_t target_time;

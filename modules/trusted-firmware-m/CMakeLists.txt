@@ -147,19 +147,19 @@ if (CONFIG_BUILD_WITH_TFM)
   set(TFM_BINARY_DIR ${CMAKE_BINARY_DIR}/tfm)
 
   set(VENEERS_FILE ${TFM_BINARY_DIR}/secure_fw/s_veneers.o)
-  set(TFM_API_NS_PATH ${TFM_BINARY_DIR}/app/libtfm_api_ns.a)
+  set(TFM_API_NS_PATH ${TFM_BINARY_DIR}/tf-m-tests/app/libtfm_api_ns.a)
   set(TFM_GENERATED_INCLUDES ${TFM_BINARY_DIR}/generated/interface/include)
   set(PLATFORM_NS_FILE ${TFM_BINARY_DIR}/platform/libplatform_ns.a)
 
   if (TFM_PSA_TEST_SUITE)
-    set(PSA_TEST_VAL_FILE ${TFM_BINARY_DIR}/app/psa_api_tests/val/val_nspe.a)
-    set(PSA_TEST_PAL_FILE ${TFM_BINARY_DIR}/app/psa_api_tests/platform/pal_nspe.a)
+    set(PSA_TEST_VAL_FILE ${TFM_BINARY_DIR}/tf-m-tests/app/psa_api_tests/val/val_nspe.a)
+    set(PSA_TEST_PAL_FILE ${TFM_BINARY_DIR}/tf-m-tests/app/psa_api_tests/platform/pal_nspe.a)
     set(COMBINE_DIR_STORAGE storage)
     set(COMBINE_DIR_PROTECTED_STORAGE storage)
     set(COMBINE_DIR_INTERNAL_TRUSTED_STORAGE storage)
     set(COMBINE_DIR_CRYPTO crypto)
     set(COMBINE_DIR_INITIAL_ATTESTATION initial_attestation)
-    set(PSA_TEST_COMBINE_FILE ${TFM_BINARY_DIR}/app/psa_api_tests/dev_apis/${COMBINE_DIR_${TFM_PSA_TEST_SUITE}}/test_combine.a)
+    set(PSA_TEST_COMBINE_FILE ${TFM_BINARY_DIR}/tf-m-tests/app/psa_api_tests/dev_apis/${COMBINE_DIR_${TFM_PSA_TEST_SUITE}}/test_combine.a)
   endif()
 
   if(CONFIG_TFM_BL2)
@@ -238,6 +238,13 @@ if (CONFIG_BUILD_WITH_TFM)
       )
   endif()
 
+  if(CONFIG_FPU AND CONFIG_FP_HARDABI)
+    list(APPEND TFM_CMAKE_ARGS -DCONFIG_TFM_FP=hard)
+    list(APPEND TFM_CMAKE_ARGS -DCONFIG_TFM_FP_ARCH=${FPU_FOR_${GCC_M_CPU}})
+  else()
+    list(APPEND TFM_CMAKE_ARGS -DCONFIG_TFM_FP=soft)
+  endif()
+
   file(MAKE_DIRECTORY ${TFM_BINARY_DIR})
   add_custom_target(tfm_cmake
     DEPENDS ${TFM_BINARY_DIR}/CMakeCache.txt
@@ -250,6 +257,7 @@ if (CONFIG_BUILD_WITH_TFM)
       -DCROSS_COMPILE=${TFM_TOOLCHAIN_PATH}/${TFM_TOOLCHAIN_PREFIX}
       -DCMAKE_BUILD_TYPE=${TFM_CMAKE_BUILD_TYPE}
       -DTFM_PLATFORM=${CONFIG_TFM_BOARD}
+      -DCONFIG_TFM_BUILD_LOG_QUIET=ON
       ${TFM_CMAKE_ARGS}
       $<GENEX_EVAL:$<TARGET_PROPERTY:zephyr_property_target,TFM_CMAKE_OPTIONS>>
       -DTFM_TEST_REPO_PATH=${ZEPHYR_TF_M_TESTS_MODULE_DIR}
@@ -324,7 +332,9 @@ if (CONFIG_BUILD_WITH_TFM)
     interface/interface.c
     )
   # Non-Secure interface to request system reboot
-  zephyr_library_sources_ifdef(CONFIG_TFM_PARTITION_PLATFORM src/reboot.c)
+  if (CONFIG_TFM_PARTITION_PLATFORM AND NOT CONFIG_TFM_PARTITION_PLATFORM_CUSTOM_REBOOT)
+    zephyr_library_sources(src/reboot.c)
+  endif()
   zephyr_library_sources_ifndef(CONFIG_TFM_PSA_TEST_NONE src/zephyr_tfm_psa_test.c)
 
   zephyr_include_directories(
@@ -409,7 +419,7 @@ if (CONFIG_BUILD_WITH_TFM)
   if (NOT CONFIG_TFM_BL2)
     # Merge tfm_s and zephyr (NS) image to a single binary.
     set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
-      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/mergehex.py
         -o ${MERGED_FILE}
         $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE>
         ${NS_APP_FILE}
@@ -423,14 +433,14 @@ if (CONFIG_BUILD_WITH_TFM)
     tfm_sign(sign_cmd NS TRUE ${S_NS_FILE} ${S_NS_SIGNED_FILE})
 
     set_property(GLOBAL APPEND PROPERTY extra_post_build_commands
-      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/mergehex.py
         -o ${S_NS_FILE}
         $<TARGET_PROPERTY:tfm,TFM_S_HEX_FILE>
         ${NS_APP_FILE}
 
       COMMAND ${sign_cmd}
 
-      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/mergehex.py
         -o ${MERGED_FILE}
         $<TARGET_PROPERTY:tfm,BL2_HEX_FILE>
         ${S_NS_SIGNED_FILE}
@@ -456,7 +466,7 @@ if (CONFIG_BUILD_WITH_TFM)
       COMMAND ${sign_cmd_ns}
       COMMAND ${sign_cmd_s}
 
-      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/mergehex.py
+      COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/mergehex.py
         -o ${MERGED_FILE}
         $<TARGET_PROPERTY:tfm,BL2_HEX_FILE>
         ${S_SIGNED_FILE}

@@ -34,6 +34,8 @@
 	aliases {
 		sw0 = &button2;
 		lora0 = &lora0;
+		watchdog0 = &wdt0;
+		spi-flash0 = &at25;
 	};
 };
 
@@ -120,7 +122,7 @@
 		/* 52K */
 		boot_partition: partition@0 {
 			label = "mcuboot";
-			reg = <0x000000000 0x0000C000>;
+			reg = <0x00000000 0x0000C000>;
 		};
 		/* 188K */
 		slot0_partition: partition@c000 {
@@ -150,7 +152,7 @@
 		/* 68K */
 		lfs_partition: partition@30000 {
 			label = "lfs_storage";
-			reg = <0x00030000 0x000010000>;
+			reg = <0x00030000 0x00010000>;
 		};
 	};
 };

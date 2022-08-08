@@ -6,7 +6,7 @@
 
 /dts-v1/;
 
-#include <andes_v5_ae350.dtsi>
+#include <andes/andes_v5_ae350.dtsi>
 
 / {
 	model = "Andes ADP-XC7K AE350";
@@ -144,7 +144,6 @@
 	status = "okay";
 	flash0: flash@0 {
 		compatible = "jedec,spi-nor";
-		label = "JEDEC SPI-NOR";
 		reg = <0>;
 		size = <16777216>;
 		spi-max-frequency = <1000000>;

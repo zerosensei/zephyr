@@ -10,20 +10,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <stddef.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/atomic.h>
-#include <sys/util.h>
-#include <sys/byteorder.h>
-#include <debug/stack.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/debug/stack.h>
 
-#include <net/buf.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/buf.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/buf.h>
 
 #include <tinycrypt/constants.h>
 #include <tinycrypt/aes.h>
@@ -357,15 +357,15 @@ static bool smp_keys_check(struct bt_conn *conn)
 		return false;
 	}
 
-	if (conn->required_sec_level > BT_SECURITY_L2 &&
+	if (conn->required_sec_level >= BT_SECURITY_L3 &&
 	    !(conn->le.keys->flags & BT_KEYS_AUTHENTICATED)) {
 		return false;
 	}
 
-	if (conn->required_sec_level > BT_SECURITY_L3 &&
-	    !(conn->le.keys->flags & BT_KEYS_AUTHENTICATED) &&
-	    !(conn->le.keys->keys & BT_KEYS_LTK_P256) &&
-	    !(conn->le.keys->enc_size == BT_SMP_MAX_ENC_KEY_SIZE)) {
+	if (conn->required_sec_level >= BT_SECURITY_L4 &&
+	    !((conn->le.keys->flags & BT_KEYS_AUTHENTICATED) &&
+	      (conn->le.keys->keys & BT_KEYS_LTK_P256) &&
+	      (conn->le.keys->enc_size == BT_SMP_MAX_ENC_KEY_SIZE))) {
 		return false;
 	}
 
@@ -845,16 +845,20 @@ static void smp_check_complete(struct bt_conn *conn, uint8_t dist_complete)
 #endif
 
 #if defined(CONFIG_BT_PRIVACY)
-static void smp_id_sent(struct bt_conn *conn, void *user_data)
+static void smp_id_sent(struct bt_conn *conn, void *user_data, int err)
 {
-	smp_check_complete(conn, BT_SMP_DIST_ID_KEY);
+	if (!err) {
+		smp_check_complete(conn, BT_SMP_DIST_ID_KEY);
+	}
 }
 #endif /* CONFIG_BT_PRIVACY */
 
 #if defined(CONFIG_BT_SIGNING)
-static void smp_sign_info_sent(struct bt_conn *conn, void *user_data)
+static void smp_sign_info_sent(struct bt_conn *conn, void *user_data, int err)
 {
-	smp_check_complete(conn, BT_SMP_DIST_SIGN);
+	if (!err) {
+		smp_check_complete(conn, BT_SMP_DIST_SIGN);
+	}
 }
 #endif /* CONFIG_BT_SIGNING */
 
@@ -2109,9 +2113,11 @@ static uint8_t smp_send_pairing_confirm(struct bt_smp *smp)
 }
 
 #if !defined(CONFIG_BT_SMP_SC_PAIR_ONLY)
-static void smp_ident_sent(struct bt_conn *conn, void *user_data)
+static void smp_ident_sent(struct bt_conn *conn, void *user_data, int err)
 {
-	smp_check_complete(conn, BT_SMP_DIST_ENC_KEY);
+	if (!err) {
+		smp_check_complete(conn, BT_SMP_DIST_ENC_KEY);
+	}
 }
 
 static void legacy_distribute_keys(struct bt_smp *smp)

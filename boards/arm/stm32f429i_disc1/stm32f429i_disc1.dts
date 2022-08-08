@@ -7,8 +7,8 @@
 /dts-v1/;
 #include <st/f4/stm32f429Xi.dtsi>
 #include <st/f4/stm32f429zitx-pinctrl.dtsi>
-#include <dt-bindings/display/stm32_ltdc.h>
-#include <dt-bindings/display/ili9xxx.h>
+#include <zephyr/dt-bindings/display/stm32_ltdc.h>
+#include <zephyr/dt-bindings/display/ili9xxx.h>
 
 / {
 	model = "STMicroelectronics STM32F429I_DISC1 board";
@@ -118,7 +118,6 @@
 	cs-gpios = <&gpioc 2 GPIO_ACTIVE_LOW>;
 	ili9341: ili9341@0 {
 		compatible = "ilitek,ili9341";
-		label = "ILI9341";
 		spi-max-frequency = <5625000>;
 		reg = <0>;
 		cmd-data-gpios = <&gpiod 13 GPIO_ACTIVE_LOW>;

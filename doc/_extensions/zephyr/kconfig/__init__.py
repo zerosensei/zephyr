@@ -83,6 +83,12 @@ def kconfig_load(app: Sphinx) -> Tuple[kconfiglib.Kconfig, Dict[str, str]]:
         with open(Path(td) / "Kconfig.modules", "w") as f:
             f.write(kconfig)
 
+        # generate dummy Kconfig.dts file
+        kconfig = ""
+
+        with open(Path(td) / "Kconfig.dts", "w") as f:
+            f.write(kconfig)
+
         # base environment
         os.environ["ZEPHYR_BASE"] = str(ZEPHYR_BASE)
         os.environ["srctree"] = str(ZEPHYR_BASE)
@@ -337,7 +343,11 @@ def kconfig_build_resources(app: Sphinx) -> None:
                 iternode = node
                 while iternode.parent is not iternode.kconfig.top_node:
                     iternode = iternode.parent
-                    menupath = f" > {iternode.prompt[0]}" + menupath
+                    if iternode.prompt:
+                        title = iternode.prompt[0]
+                    else:
+                        title = kconfiglib.standard_sc_expr_str(iternode.item)
+                    menupath = f" > {title}" + menupath
 
                 menupath = "(Top)" + menupath
 

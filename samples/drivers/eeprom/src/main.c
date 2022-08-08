@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <sys/printk.h>
-#include <drivers/eeprom.h>
-#include <device.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/drivers/eeprom.h>
+#include <zephyr/device.h>
 
 #define EEPROM_SAMPLE_OFFSET 0
 #define EEPROM_SAMPLE_MAGIC  0xEE9703
@@ -47,7 +47,7 @@ void main(void)
 	}
 
 	eeprom_size = eeprom_get_size(eeprom);
-	printk("Using eeprom with size of: %d.\n", eeprom_size);
+	printk("Using eeprom with size of: %zu.\n", eeprom_size);
 
 	rc = eeprom_read(eeprom, EEPROM_SAMPLE_OFFSET, &values, sizeof(values));
 	if (rc < 0) {

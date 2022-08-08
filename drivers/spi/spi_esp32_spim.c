@@ -10,17 +10,17 @@
 #include <hal/spi_hal.h>
 #include <esp_attr.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(esp32_spi, CONFIG_SPI_LOG_LEVEL);
 
 #include <soc.h>
-#include <drivers/spi.h>
+#include <zephyr/drivers/spi.h>
 #ifndef CONFIG_SOC_ESP32C3
-#include <drivers/interrupt_controller/intc_esp32.h>
+#include <zephyr/drivers/interrupt_controller/intc_esp32.h>
 #else
-#include <drivers/interrupt_controller/intc_esp32c3.h>
+#include <zephyr/drivers/interrupt_controller/intc_esp32c3.h>
 #endif
-#include <drivers/clock_control.h>
+#include <zephyr/drivers/clock_control.h>
 #include "spi_context.h"
 #include "spi_esp32_spim.h"
 
@@ -189,6 +189,7 @@ static int IRAM_ATTR spi_esp32_configure(const struct device *dev,
 		return -ENOTSUP;
 	}
 
+	hal_dev->cs_pin_id = ctx->config->slave;
 	int ret = pinctrl_apply_state(cfg->pcfg, PINCTRL_STATE_DEFAULT);
 
 	/* input parameters to calculate timing configuration */

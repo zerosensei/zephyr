@@ -5,9 +5,9 @@
  */
 #include <stdint.h>
 
-#include <toolchain.h>
-#include <sys/util.h>
-#include <sys/byteorder.h>
+#include <zephyr/toolchain.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/byteorder.h>
 
 #include "hal/ccm.h"
 #include "hal/radio.h"
@@ -226,7 +226,7 @@ enum sync_status lll_sync_cte_is_allowed(uint8_t cte_type_mask, uint8_t filter_p
 	}
 
 	if (!cte_ok) {
-		return filter_policy ? SYNC_STAT_READY_OR_CONT_SCAN : SYNC_STAT_TERM;
+		return filter_policy ? SYNC_STAT_CONT_SCAN : SYNC_STAT_TERM;
 	}
 
 	return SYNC_STAT_ALLOWED;
@@ -471,10 +471,15 @@ static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 
 		lll = ull_scan_lll_is_valid_get(next);
 		if (!lll) {
-			/* Abort current event as next event is not a scan
-			 * event.
-			 */
-			return -ECANCELED;
+			struct lll_scan_aux *lll_aux;
+
+			lll_aux = ull_scan_aux_lll_is_valid_get(next);
+			if (!lll_aux) {
+				/* Abort current event as next event is not a
+				 * scan and not a scan aux event.
+				 */
+				return -ECANCELED;
+			}
 		}
 	}
 
@@ -644,8 +649,17 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 		 * - allocating an extra node_rx for periodic report incomplete
 		 * - a buffer for receiving data in a connection
 		 * - a buffer for receiving empty PDU
+		 *
+		 * If this is a reception of chained PDU, node_type is
+		 * NODE_RX_TYPE_EXT_AUX_REPORT, then there is no need to reserve
+		 * again a node_rx for periodic report incomplete.
 		 */
-		node_rx = ull_pdu_rx_alloc_peek(4);
+		if (node_type != NODE_RX_TYPE_EXT_AUX_REPORT) {
+			node_rx = ull_pdu_rx_alloc_peek(4);
+		} else {
+			node_rx = ull_pdu_rx_alloc_peek(3);
+		}
+
 		if (node_rx) {
 			struct node_rx_ftr *ftr;
 			struct pdu_adv *pdu;
@@ -814,7 +828,7 @@ static void isr_rx_adv_sync_estab(void *param)
 isr_rx_done:
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_CTE_TYPE_FILTERING) && \
 	defined(CONFIG_BT_CTLR_CTEINLINE_SUPPORT)
-	isr_rx_done_cleanup(lll, crc_ok, sync_ok == SYNC_STAT_TERM);
+	isr_rx_done_cleanup(lll, crc_ok, sync_ok != SYNC_STAT_ALLOWED);
 #else
 	isr_rx_done_cleanup(lll, crc_ok, false);
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_CTE_TYPE_FILTERING && CONFIG_BT_CTLR_CTEINLINE_SUPPORT */
@@ -869,8 +883,8 @@ static void isr_rx_adv_sync(void *param)
 	 * affect synchronization even when new CTE type is not allowed by sync parameters.
 	 * Hence the SYNC_STAT_READY is set.
 	 */
-	err = isr_rx(lll, NODE_RX_TYPE_SYNC_REPORT, crc_ok, phy_flags_rx,
-		     cte_ready, rssi_ready, SYNC_STAT_READY_OR_CONT_SCAN);
+	err = isr_rx(lll, NODE_RX_TYPE_SYNC_REPORT, crc_ok, phy_flags_rx, cte_ready, rssi_ready,
+		     SYNC_STAT_READY);
 	if (err == -EBUSY) {
 		return;
 	}
@@ -938,8 +952,8 @@ static void isr_rx_aux_chain(void *param)
 	 * affect synchronization even when new CTE type is not allowed by sync parameters.
 	 * Hence the SYNC_STAT_READY is set.
 	 */
-	err = isr_rx(lll, NODE_RX_TYPE_EXT_AUX_REPORT, crc_ok, phy_flags_rx,
-		     cte_ready, rssi_ready, SYNC_STAT_READY_OR_CONT_SCAN);
+	err = isr_rx(lll, NODE_RX_TYPE_EXT_AUX_REPORT, crc_ok, phy_flags_rx, cte_ready, rssi_ready,
+		     SYNC_STAT_READY);
 
 	if (err == -EBUSY) {
 		return;

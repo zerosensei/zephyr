@@ -8,17 +8,17 @@
 #define DT_DRV_COMPAT nxp_lpc_spi
 
 #include <errno.h>
-#include <drivers/spi.h>
-#include <drivers/clock_control.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/clock_control.h>
 #include <fsl_spi.h>
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 #ifdef CONFIG_SPI_MCUX_FLEXCOMM_DMA
-#include <drivers/dma.h>
+#include <zephyr/drivers/dma.h>
 #endif
 #ifdef CONFIG_PINCTRL
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/pinctrl.h>
 #endif
-#include <sys_clock.h>
+#include <zephyr/sys_clock.h>
 
 LOG_MODULE_REGISTER(spi_mcux_flexcomm, CONFIG_SPI_LOG_LEVEL);
 
@@ -36,6 +36,7 @@ struct spi_mcux_config {
 	uint32_t post_delay;
 	uint32_t frame_delay;
 	uint32_t transfer_delay;
+	uint32_t def_char;
 #ifdef CONFIG_PINCTRL
 	const struct pinctrl_dev_config *pincfg;
 #endif
@@ -247,9 +248,10 @@ static int spi_mcux_configure(const struct device *dev,
 
 		SPI_MasterInit(base, &master_config, clock_freq);
 
+		SPI_SetDummyData(base, (uint8_t)config->def_char);
+
 		SPI_MasterTransferCreateHandle(base, &data->handle,
 					     spi_mcux_transfer_callback, data);
-		SPI_SetDummyData(base, 0);
 
 		data->ctx.config = spi_cfg;
 	} else {
@@ -277,6 +279,8 @@ static int spi_mcux_configure(const struct device *dev,
 		slave_config.dataWidth = word_size - 1;
 
 		SPI_SlaveInit(base, &slave_config);
+
+		SPI_SetDummyData(base, (uint8_t)config->def_char);
 
 		SPI_SlaveTransferCreateHandle(base, &data->handle,
 					      spi_mcux_transfer_callback, data);
@@ -823,6 +827,7 @@ static void spi_mcux_config_func_##id(const struct device *dev) \
 		.post_delay = DT_INST_PROP_OR(id, post_delay, 0),		\
 		.frame_delay = DT_INST_PROP_OR(id, frame_delay, 0),		\
 		.transfer_delay = DT_INST_PROP_OR(id, transfer_delay, 0),		\
+		.def_char = DT_INST_PROP_OR(id, def_char, 0),		\
 		SPI_MCUX_FLEXCOMM_PINCTRL_INIT(id)			\
 	};								\
 	static struct spi_mcux_data spi_mcux_data_##id = {		\

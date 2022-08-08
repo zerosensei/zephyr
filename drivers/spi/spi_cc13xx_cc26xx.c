@@ -7,13 +7,13 @@
 #define DT_DRV_COMPAT ti_cc13xx_cc26xx_spi
 
 #define LOG_LEVEL CONFIG_SPI_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(spi_cc13xx_cc26xx);
 
-#include <drivers/spi.h>
-#include <drivers/pinctrl.h>
-#include <pm/device.h>
-#include <pm/policy.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/pinctrl.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/pm/policy.h>
 
 #include <driverlib/prcm.h>
 #include <driverlib/ssi.h>
@@ -248,7 +248,7 @@ static const struct spi_driver_api spi_cc13xx_cc26xx_driver_api = {
 		} else {						  \
 			Power_setDependency(PowerCC26XX_PERIPH_SSI1);	  \
 		}							  \
-	} while (0)
+	} while (false)
 #else
 #define SPI_CC13XX_CC26XX_POWER_SPI(n)					  \
 	do {								  \
@@ -277,11 +277,11 @@ static const struct spi_driver_api spi_cc13xx_cc26xx_driver_api = {
 		}							  \
 									  \
 		/* SSI should not be accessed until power domain is on. */\
-		while (PRCMPowerDomainStatus(domain) !=			  \
+		while (PRCMPowerDomainsAllOn(domain) !=			  \
 			PRCM_DOMAIN_POWER_ON) {				  \
 			continue;					  \
 		}							  \
-	} while (0)
+	} while (false)
 #endif
 
 #define SPI_CC13XX_CC26XX_DEVICE_INIT(n)				    \

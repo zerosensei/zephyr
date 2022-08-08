@@ -6,9 +6,9 @@
  */
 #include <stdint.h>
 #include <string.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/mesh.h>
-#include <net/buf.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/mesh.h>
+#include <zephyr/net/buf.h>
 #include "host/testing.h"
 #include "net.h"
 #include "adv.h"
@@ -214,7 +214,13 @@ static void reset_adv_link(void)
 		(void)memset(&link, 0, offsetof(struct pb_adv, tx.retransmit));
 		link.rx.id = XACT_ID_NVAL;
 	} else {
-		/* Accept another provisioning attempt */
+		/* If provisioned, reset the link callback to stop receiving provisioning advs,
+		 * otherwise keep the callback to accept another provisioning attempt.
+		 */
+		if (bt_mesh_is_provisioned()) {
+			link.cb = NULL;
+		}
+
 		link.id = 0;
 		atomic_clear(link.flags);
 		link.rx.id = XACT_ID_MAX;

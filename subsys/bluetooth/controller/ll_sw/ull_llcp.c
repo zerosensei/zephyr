@@ -6,10 +6,10 @@
 
 #include <zephyr/types.h>
 
-#include <bluetooth/hci.h>
-#include <sys/byteorder.h>
-#include <sys/slist.h>
-#include <sys/util.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/slist.h>
+#include <zephyr/sys/util.h>
 
 #include "hal/ccm.h"
 
@@ -26,8 +26,14 @@
 #include "lll.h"
 #include "lll/lll_df_types.h"
 #include "lll_conn.h"
+#include "lll_conn_iso.h"
 
 #include "ull_tx_queue.h"
+
+#include "isoal.h"
+#include "ull_iso_types.h"
+#include "ull_conn_iso_types.h"
+#include "ull_conn_iso_internal.h"
 
 #include "ull_internal.h"
 #include "ull_conn_types.h"
@@ -92,6 +98,18 @@ void llcp_proc_ctx_release(struct proc_ctx *ctx)
 }
 
 #if defined(LLCP_TX_CTRL_BUF_QUEUE_ENABLE)
+/*
+ * @brief Update 'global' tx buffer allowance
+ */
+void ull_cp_update_tx_buffer_queue(struct ll_conn *conn)
+{
+	if (conn->llcp.tx_buffer_alloc > CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM) {
+		common_tx_buffer_alloc -= (conn->llcp.tx_buffer_alloc -
+					   CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM);
+	}
+}
+
+
 /*
  * @brief Check for per conn pre-allocated tx buffer allowance
  * @return true if buffer is available
@@ -159,8 +177,8 @@ void llcp_tx_alloc_unpeek(struct proc_ctx *ctx)
  */
 struct node_tx *llcp_tx_alloc(struct ll_conn *conn, struct proc_ctx *ctx)
 {
-#if (CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0)
 	conn->llcp.tx_buffer_alloc++;
+#if (CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0)
 	if (conn->llcp.tx_buffer_alloc > CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM) {
 		common_tx_buffer_alloc++;
 		/* global buffer allocated, so we're at the head and should just pop head */
@@ -239,16 +257,21 @@ void llcp_tx_enqueue(struct ll_conn *conn, struct node_tx *tx)
 
 void llcp_tx_pause_data(struct ll_conn *conn, enum llcp_tx_q_pause_data_mask pause_mask)
 {
-	if ((conn->llcp.tx_q_pause_data_mask & pause_mask) == 0) {
-		conn->llcp.tx_q_pause_data_mask |= pause_mask;
+	/* Only pause the TX Q if we have not already paused it (by any procedure) */
+	if (conn->llcp.tx_q_pause_data_mask == 0) {
 		ull_tx_q_pause_data(&conn->tx_q);
 	}
+
+	/* Add the procedure that paused data */
+	conn->llcp.tx_q_pause_data_mask |= pause_mask;
 }
 
 void llcp_tx_resume_data(struct ll_conn *conn, enum llcp_tx_q_pause_data_mask resume_mask)
 {
+	/* Remove the procedure that paused data */
 	conn->llcp.tx_q_pause_data_mask &= ~resume_mask;
 
+	/* Only resume the TX Q if we have removed all procedures that paused data */
 	if (conn->llcp.tx_q_pause_data_mask == 0) {
 		ull_tx_q_resume_data(&conn->tx_q);
 	}
@@ -341,6 +364,11 @@ struct proc_ctx *llcp_create_local_procedure(enum llcp_proc proc)
 		llcp_lp_comm_init_proc(ctx);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	case PROC_CIS_TERMINATE:
+		llcp_lp_comm_init_proc(ctx);
+		break;
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT(0);
@@ -412,6 +440,17 @@ struct proc_ctx *llcp_create_remote_procedure(enum llcp_proc proc)
 		llcp_rp_comm_init_proc(ctx);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
+#if defined(CONFIG_BT_PERIPHERAL) && defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	case PROC_CIS_CREATE:
+		llcp_rp_cc_init_proc(ctx);
+		break;
+#endif /* CONFIG_BT_PERIPHERAL && CONFIG_BT_CTLR_PERIPHERAL_ISO */
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	case PROC_CIS_TERMINATE:
+		llcp_rp_comm_init_proc(ctx);
+		break;
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
+
 	default:
 		/* Unknown procedure */
 		LL_ASSERT(0);
@@ -485,9 +524,6 @@ void ull_llcp_init(struct ll_conn *conn)
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	conn->llcp.cte_req.is_enabled = 0U;
 	conn->llcp.cte_req.req_expire = 0U;
-	conn->llcp.cte_req.is_active = 0U;
-	conn->llcp.cte_req.disable_param = NULL;
-	conn->llcp.cte_req.disable_cb = NULL;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	conn->llcp.cte_rsp.is_enabled = 0U;
@@ -497,9 +533,7 @@ void ull_llcp_init(struct ll_conn *conn)
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
 
 #if defined(LLCP_TX_CTRL_BUF_QUEUE_ENABLE)
-#if (CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0)
 	conn->llcp.tx_buffer_alloc = 0;
-#endif /* (CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0) */
 #endif /* LLCP_TX_CTRL_BUF_QUEUE_ENABLE */
 
 	conn->llcp.tx_q_pause_data_mask = 0;
@@ -509,15 +543,13 @@ void ull_llcp_init(struct ll_conn *conn)
 void ull_cp_release_tx(struct ll_conn *conn, struct node_tx *tx)
 {
 #if defined(LLCP_TX_CTRL_BUF_QUEUE_ENABLE)
-#if (CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0)
-	if (conn->llcp.tx_buffer_alloc > CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM) {
-		common_tx_buffer_alloc--;
+	if (conn) {
+		LL_ASSERT(conn->llcp.tx_buffer_alloc > 0);
+		if (conn->llcp.tx_buffer_alloc > CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM) {
+			common_tx_buffer_alloc--;
+		}
+		conn->llcp.tx_buffer_alloc--;
 	}
-	conn->llcp.tx_buffer_alloc--;
-#else /* CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0 */
-	ARG_UNUSED(conn);
-	common_tx_buffer_alloc--;
-#endif /* CONFIG_BT_CTLR_LLCP_PER_CONN_TX_CTRL_BUF_NUM > 0 */
 #else /* LLCP_TX_CTRL_BUF_QUEUE_ENABLE */
 	ARG_UNUSED(conn);
 #endif /* LLCP_TX_CTRL_BUF_QUEUE_ENABLE */
@@ -545,20 +577,40 @@ static int prt_elapse(uint16_t *expire, uint16_t elapsed_event)
 	return 0;
 }
 
-int ull_cp_prt_elapse(struct ll_conn *conn, uint16_t elapsed_event)
+int ull_cp_prt_elapse(struct ll_conn *conn, uint16_t elapsed_event, uint8_t *error_code)
 {
 	int loc_ret;
 	int rem_ret;
 
 	loc_ret = prt_elapse(&conn->llcp.local.prt_expire, elapsed_event);
-	rem_ret = prt_elapse(&conn->llcp.remote.prt_expire, elapsed_event);
+	if (loc_ret == -ETIMEDOUT) {
+		/* Local Request Machine timed out */
 
-	if (loc_ret == -ETIMEDOUT || rem_ret == -ETIMEDOUT) {
-		/* One of the timers expired */
+		struct proc_ctx *ctx;
+
+		ctx = llcp_lr_peek(conn);
+		LL_ASSERT(ctx);
+
+		if (ctx->proc == PROC_TERMINATE) {
+			/* Active procedure is ACL Termination */
+			*error_code = ctx->data.term.error_code;
+		} else {
+			*error_code = BT_HCI_ERR_LL_RESP_TIMEOUT;
+		}
+
+		return -ETIMEDOUT;
+	}
+
+	rem_ret = prt_elapse(&conn->llcp.remote.prt_expire, elapsed_event);
+	if (rem_ret == -ETIMEDOUT) {
+		/* Remote Request Machine timed out */
+
+		*error_code = BT_HCI_ERR_LL_RESP_TIMEOUT;
 		return -ETIMEDOUT;
 	}
 
 	/* Both timers are still running */
+	*error_code = BT_HCI_ERR_SUCCESS;
 	return 0;
 }
 
@@ -771,6 +823,31 @@ uint8_t ull_cp_terminate(struct ll_conn *conn, uint8_t error_code)
 
 	return BT_HCI_ERR_SUCCESS;
 }
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+uint8_t ull_cp_cis_terminate(struct ll_conn *conn,
+			     struct ll_conn_iso_stream *cis,
+			     uint8_t error_code)
+{
+	struct proc_ctx *ctx;
+
+	if (conn->lll.handle != cis->lll.acl_handle) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	ctx = llcp_create_local_procedure(PROC_CIS_TERMINATE);
+	if (!ctx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	ctx->data.cis_term.cig_id = cis->group->cig_id;
+	ctx->data.cis_term.cis_id = cis->cis_id;
+	ctx->data.cis_term.error_code = error_code;
+
+	llcp_lr_enqueue(conn, ctx);
+
+	return BT_HCI_ERR_SUCCESS;
+}
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 
 #if defined(CONFIG_BT_CENTRAL)
 uint8_t ull_cp_chan_map_update(struct ll_conn *conn, const uint8_t chm[5])
@@ -945,6 +1022,15 @@ void ull_cp_conn_param_req_neg_reply(struct ll_conn *conn, uint8_t error_code)
 		llcp_rp_conn_param_req_neg_reply(conn, ctx);
 	}
 }
+
+uint8_t ull_cp_remote_cpr_pending(struct ll_conn *conn)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_rr_peek(conn);
+
+	return (ctx && ctx->proc == PROC_CONN_PARAM_REQ);
+}
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
@@ -965,6 +1051,19 @@ uint8_t ull_cp_cte_req(struct ll_conn *conn, uint8_t min_cte_len, uint8_t cte_ty
 {
 	struct proc_ctx *ctx;
 
+	/* If Controller gained, awareness:
+	 * - by Feature Exchange control procedure that peer device does not support CTE response,
+	 * - by reception LL_UNKNOWN_RSP with unknown type LL_CTE_REQ that peer device does not
+	 *   recognize CTE request,
+	 * then response to Host that CTE request enable command is not possible due to unsupported
+	 * remote feature.
+	 */
+	if ((conn->llcp.fex.valid &&
+	     (!(conn->llcp.fex.features_peer & BIT64(BT_LE_FEAT_BIT_CONN_CTE_RESP)))) ||
+	    (!conn->llcp.fex.valid && !feature_cte_req(conn))) {
+		return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
+	}
+
 	/* The request may be started by periodic CTE request procedure, so it skips earlier
 	 * verification of PHY. In case the PHY has changed to CODE the request should be stopped.
 	 */
@@ -981,8 +1080,6 @@ uint8_t ull_cp_cte_req(struct ll_conn *conn, uint8_t min_cte_len, uint8_t cte_ty
 		ctx->data.cte_req.min_len = min_cte_len;
 		ctx->data.cte_req.type = cte_type;
 
-		conn->llcp.cte_req.is_active = 1U;
-
 		llcp_lr_enqueue(conn, ctx);
 
 		return BT_HCI_ERR_SUCCESS;
@@ -997,6 +1094,53 @@ void ull_cp_cte_req_set_disable(struct ll_conn *conn)
 	conn->llcp.cte_req.req_interval = 0U;
 }
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
+#if defined(CONFIG_BT_PERIPHERAL) && defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+bool ull_cp_cc_awaiting_reply(struct ll_conn *conn)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_rr_peek(conn);
+	if (ctx && ctx->proc == PROC_CIS_CREATE) {
+		return llcp_rp_cc_awaiting_reply(ctx);
+	}
+
+	return false;
+
+}
+
+uint16_t ull_cp_cc_ongoing_handle(struct ll_conn *conn)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_rr_peek(conn);
+	if (ctx && ctx->proc == PROC_CIS_CREATE) {
+		return ctx->data.cis_create.cis_handle;
+	}
+
+	return 0xFFFF;
+}
+
+void ull_cp_cc_accept(struct ll_conn *conn)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_rr_peek(conn);
+	if (ctx && ctx->proc == PROC_CIS_CREATE) {
+		llcp_rp_cc_accept(conn, ctx);
+	}
+}
+
+void ull_cp_cc_reject(struct ll_conn *conn, uint8_t error_code)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_rr_peek(conn);
+	if (ctx && ctx->proc == PROC_CIS_CREATE) {
+		ctx->data.cis_create.error = error_code;
+		llcp_rp_cc_reject(conn, ctx);
+	}
+}
+#endif /* defined(CONFIG_BT_PERIPHERAL) && defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 
 static bool pdu_is_expected(struct pdu_data *pdu, struct proc_ctx *ctx)
 {
@@ -1014,9 +1158,18 @@ static bool pdu_is_reject(struct pdu_data *pdu, struct proc_ctx *ctx)
 	/* For LL_REJECT_IND there is no simple way of confirming protocol validity of the PDU
 	 * for the given procedure, so simply pass it on and let procedure engine deal with it
 	 */
-	return (((pdu->llctrl.opcode == PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND) &&
-		 (ctx->tx_opcode == pdu->llctrl.reject_ext_ind.reject_opcode)) ||
-		(pdu->llctrl.opcode == PDU_DATA_LLCTRL_TYPE_REJECT_IND));
+	return (pdu->llctrl.opcode == PDU_DATA_LLCTRL_TYPE_REJECT_IND);
+}
+
+static bool pdu_is_reject_ext(struct pdu_data *pdu, struct proc_ctx *ctx)
+{
+	return ((pdu->llctrl.opcode == PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND) &&
+		(ctx->tx_opcode == pdu->llctrl.reject_ext_ind.reject_opcode));
+}
+
+static bool pdu_is_any_reject(struct pdu_data *pdu, struct proc_ctx *ctx)
+{
+	return (pdu_is_reject_ext(pdu, ctx) || pdu_is_reject(pdu, ctx));
 }
 
 static bool pdu_is_terminate(struct pdu_data *pdu)
@@ -1417,6 +1570,23 @@ void ull_cp_tx_ack(struct ll_conn *conn, struct node_tx *tx)
 	}
 }
 
+void ull_cp_tx_ntf(struct ll_conn *conn)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_lr_peek(conn);
+	if (ctx) {
+		/* TX notifications towards Host */
+		llcp_lr_tx_ntf(conn, ctx);
+	}
+
+	ctx = llcp_rr_peek(conn);
+	if (ctx) {
+		/* TX notifications towards Host */
+		llcp_rr_tx_ntf(conn, ctx);
+	}
+}
+
 void ull_cp_rx(struct ll_conn *conn, struct node_rx_pdu *rx)
 {
 	struct proc_ctx *ctx_l;
@@ -1463,14 +1633,13 @@ void ull_cp_rx(struct ll_conn *conn, struct node_rx_pdu *rx)
 			/* Local active procedure
 			 * Remote active procedure
 			 */
-
 			unexpected_l = !(pdu_is_expected(pdu, ctx_l) ||
 					 pdu_is_unknown(pdu, ctx_l) ||
-					 pdu_is_reject(pdu, ctx_l));
+					 pdu_is_any_reject(pdu, ctx_l));
 
 			unexpected_r = !(pdu_is_expected(pdu, ctx_r) ||
 					 pdu_is_unknown(pdu, ctx_r) ||
-					 pdu_is_reject(pdu, ctx_r));
+					 pdu_is_reject_ext(pdu, ctx_r));
 
 			if (unexpected_l && unexpected_r) {
 				/* Local active procedure
@@ -1516,7 +1685,7 @@ void ull_cp_rx(struct ll_conn *conn, struct node_rx_pdu *rx)
 
 			unexpected_l = !(pdu_is_expected(pdu, ctx_l) ||
 					 pdu_is_unknown(pdu, ctx_l) ||
-					 pdu_is_reject(pdu, ctx_l));
+					 pdu_is_any_reject(pdu, ctx_l));
 
 			if (unexpected_l) {
 				/* Local active procedure
@@ -1570,6 +1739,13 @@ uint16_t ctx_buffers_free(void)
 {
 	return local_ctx_buffers_free() + remote_ctx_buffers_free();
 }
+
+#if defined(LLCP_TX_CTRL_BUF_QUEUE_ENABLE)
+uint8_t common_tx_buffer_alloc_count(void)
+{
+	return common_tx_buffer_alloc;
+}
+#endif /* LLCP_TX_CTRL_BUF_QUEUE_ENABLE */
 
 void test_int_mem_proc_ctx(void)
 {

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <ztest.h>
-#include <pm/pm.h>
-#include <pm/device.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/ztest.h>
+#include <zephyr/pm/pm.h>
+#include <zephyr/pm/device.h>
 
 #define DEV_NAME DT_NODELABEL(gpio0)
 
@@ -84,7 +84,7 @@ void test_wakeup_device_api(void)
 	zassert_not_null(dev, "Failed to get device");
 
 	ret = pm_device_wakeup_is_capable(dev);
-	zassert_true(ret, "Device marked as capable");
+	zassert_true(ret, "Device not marked as capable");
 
 	ret = pm_device_wakeup_enable(dev, true);
 	zassert_true(ret, "Could not enable wakeup source");

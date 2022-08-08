@@ -6,10 +6,10 @@
 
 #include <zephyr/types.h>
 
-#include <bluetooth/hci.h>
-#include <sys/byteorder.h>
-#include <sys/slist.h>
-#include <sys/util.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/slist.h>
+#include <zephyr/sys/util.h>
 
 #include "hal/ccm.h"
 
@@ -25,8 +25,14 @@
 #include "lll.h"
 #include "lll/lll_df_types.h"
 #include "lll_conn.h"
+#include "lll_conn_iso.h"
 
 #include "ull_tx_queue.h"
+
+#include "isoal.h"
+#include "ull_iso_types.h"
+#include "ull_conn_iso_types.h"
+#include "ull_conn_iso_internal.h"
 
 #include "ull_conn_types.h"
 #include "ull_llcp.h"
@@ -128,6 +134,11 @@ void llcp_lr_prt_restart(struct ll_conn *conn)
 	conn->llcp.local.prt_expire = conn->llcp.prt_reload;
 }
 
+void llcp_lr_prt_restart_with_value(struct ll_conn *conn, uint16_t value)
+{
+	conn->llcp.local.prt_expire = value;
+}
+
 void llcp_lr_prt_stop(struct ll_conn *conn)
 {
 	conn->llcp.local.prt_expire = 0U;
@@ -185,6 +196,11 @@ void llcp_lr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *
 		llcp_lp_comm_rx(conn, ctx, rx);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	case PROC_CIS_TERMINATE:
+		llcp_lp_comm_rx(conn, ctx, rx);
+		break;
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT(0);
@@ -215,10 +231,31 @@ void llcp_lr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *
 		llcp_lp_pu_tx_ack(conn, ctx, tx);
 		break;
 #endif /* CONFIG_BT_CTLR_PHY */
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	case PROC_CIS_TERMINATE:
+		llcp_lp_comm_tx_ack(conn, ctx, tx);
+		break;
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 	default:
 		break;
 		/* Ignore tx_ack */
 	}
+	lr_check_done(conn, ctx);
+}
+
+void llcp_lr_tx_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
+{
+	switch (ctx->proc) {
+#if defined(CONFIG_BT_CTLR_PHY)
+	case PROC_PHY_UPDATE:
+		llcp_lp_pu_tx_ntf(conn, ctx);
+		break;
+#endif /* CONFIG_BT_CTLR_PHY */
+	default:
+		/* Ignore other procedures */
+		break;
+	}
+
 	lr_check_done(conn, ctx);
 }
 
@@ -279,6 +316,11 @@ static void lr_act_run(struct ll_conn *conn)
 		llcp_lp_comm_run(conn, ctx, NULL);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	case PROC_CIS_TERMINATE:
+		llcp_lp_comm_run(conn, ctx, NULL);
+		break;
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT(0);

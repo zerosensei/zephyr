@@ -49,6 +49,8 @@
 		led0 = &led0;
 		led1 = &led1;
 		sw0 = &button0;
+		watchdog0 = &wdt0;
+		spi-flash0 = &gd25q16;
 	};
 };
 
@@ -123,7 +125,7 @@
 
 		boot_partition: partition@0 {
 			label = "mcuboot";
-			reg = <0x000000000 0x0000C000>;
+			reg = <0x00000000 0x0000C000>;
 		};
 		slot0_partition: partition@c000 {
 			label = "image-0";

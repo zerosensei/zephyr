@@ -6,14 +6,14 @@
  */
 #include <sys/types.h>
 
-#include <sys/byteorder.h>
-#include <sys/check.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/check.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/iso.h>
-#include <bluetooth/buf.h>
-#include <bluetooth/direction.h>
-#include <bluetooth/addr.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/iso.h>
+#include <zephyr/bluetooth/buf.h>
+#include <zephyr/bluetooth/direction.h>
+#include <zephyr/bluetooth/addr.h>
 
 #include "hci_core.h"
 #include "conn_internal.h"
@@ -460,8 +460,6 @@ static void le_adv_recv(bt_addr_le_t *addr, struct bt_le_scan_recv_info *info,
 				bt_lookup_id_addr(BT_ID_DEFAULT, addr));
 	}
 
-	info->addr = &id_addr;
-
 	if (scan_dev_found_cb) {
 		net_buf_simple_save(buf, &state);
 
@@ -470,6 +468,8 @@ static void le_adv_recv(bt_addr_le_t *addr, struct bt_le_scan_recv_info *info,
 
 		net_buf_simple_restore(buf, &state);
 	}
+
+	info->addr = &id_addr;
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&scan_cbs, listener, next, node) {
 		if (listener->recv) {
@@ -481,6 +481,9 @@ static void le_adv_recv(bt_addr_le_t *addr, struct bt_le_scan_recv_info *info,
 			net_buf_simple_restore(buf, &state);
 		}
 	}
+
+	/* Clear pointer to this stack frame before returning to calling function */
+	info->addr = NULL;
 
 #if defined(CONFIG_BT_CENTRAL)
 	check_pending_conn(&id_addr, addr, info->adv_props);
@@ -721,6 +724,13 @@ static struct bt_le_per_adv_sync *get_pending_per_adv_sync(void)
 	}
 
 	return NULL;
+}
+
+void bt_periodic_sync_disable(void)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(per_adv_sync_pool); i++) {
+		per_adv_sync_delete(&per_adv_sync_pool[i]);
+	}
 }
 
 struct bt_le_per_adv_sync *bt_hci_get_per_adv_sync(uint16_t handle)

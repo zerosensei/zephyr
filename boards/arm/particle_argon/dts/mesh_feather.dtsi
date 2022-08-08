@@ -19,6 +19,7 @@
 		led3 = &status_blue;
 		sw0 = &mode_button;
 		sw1 = &reset_button;
+		spi-flash0 = &mx25l32;
 	};
 
 	chosen {
@@ -133,7 +134,7 @@ feather_adc: &adc { /* feather ADC */
 
 		boot_partition: partition@0 {
 			label = "mcuboot";
-			reg = <0x000000000 0x0000C000>;
+			reg = <0x00000000 0x0000C000>;
 		};
 		slot0_partition: partition@c000 {
 			label = "image-0";
