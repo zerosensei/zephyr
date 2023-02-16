@@ -21,6 +21,8 @@ manifest:
   remotes:
     - name: upstream
       url-base: https://github.com/zephyrproject-rtos
+    - name: ken
+      url-base: https://github.com/zerosensei
 
   #
   # Please add items below based on alphabetical order
@@ -131,6 +133,12 @@ manifest:
     - name: hal_stm32
       revision: b916f9a01c665194fbbdd6a67a0f37b4e0a7e78c
       path: modules/hal/stm32
+      groups:
+        - hal
+    - name: hal_wch
+      revision: b916f9a01c665194fbbdd6a67a0f37b4e0a7e78c
+      path: modules/hal/wch
+      remote: ken
       groups:
         - hal
     - name: hal_telink
