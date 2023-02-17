@@ -2,31 +2,31 @@
 # SPDX-License-Identifier: Apache-2.0
 
 config SOC_CH32V307
-	depends on SOC_SERIES_CH32V
+	depends on SOC_SERIES_CH32V30X
 	bool
 	select CPU_HAS_FPU
 
 config SOC_CH32V305
-	depends on SOC_SERIES_CH32V
+	depends on SOC_SERIES_CH32V30X
 	bool
 	select CPU_HAS_FPU
 
 config SOC_CH32V303
-	depends on SOC_SERIES_CH32V
+	depends on SOC_SERIES_CH32V30X
 	bool
 	select CPU_HAS_FPU
 
 config SOC_CH32V208
-	depends on SOC_SERIES_CH32V
+	depends on SOC_SERIES_CH32V30X
 	bool
 
 config SOC_CH32V203
-	depends on SOC_SERIES_CH32V
+	depends on SOC_SERIES_CH32V30X
 	bool
 
 choice 
-	prompt "CH32V MCU Selection"
-	depends on SOC_SERIES_CH32V
+	prompt "CH32V30x MCU Selection"
+	depends on SOC_SERIES_CH32V30X
 
 config SOC_CH32V307_VCT6
 	bool "CH32V307_VCT6"

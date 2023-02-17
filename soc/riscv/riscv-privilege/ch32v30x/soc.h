@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Nanjing Qinheng Microelectronics
+ * Copyright (c) 2023 zerosensei
  *
  * SPDX-License-Identifier: Apache-2.0
  */

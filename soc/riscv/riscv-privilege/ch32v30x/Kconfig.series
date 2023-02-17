@@ -1,0 +1,15 @@
+# Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+
+config SOC_SERIES_CH32V30X
+	bool "CH32V30X Series MCU"
+	select RISCV
+	select SOC_FAMILY_RISCV_PRIVILEGE
+	select INCLUDE_RESET_VECTOR
+	select BUILD_OUTPUT_HEX
+
+	# select DYNAMIC_INTERRUPTS
+	select HAS_CH32V30X_HAL
+
+	help
+		Enable support for CH32V30X MCU series
