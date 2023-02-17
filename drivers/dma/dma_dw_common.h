@@ -7,8 +7,8 @@
 #ifndef ZEPHYR_DRIVERS_DMA_DMA_DW_COMMON_H_
 #define ZEPHYR_DRIVERS_DMA_DMA_DW_COMMON_H_
 
-#include <sys/atomic.h>
-#include <drivers/dma.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/drivers/dma.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -221,17 +221,12 @@ struct dw_dma_chan_data {
  */
 static const uint32_t burst_elems[] = {1, 2, 4, 8};
 
-#if CONFIG_DMA_HW_LLI
-#define DW_DMA_BUFFER_PERIOD_COUNT	4
-#else
-#define DW_DMA_BUFFER_PERIOD_COUNT	2
-#endif
-
 /* Device run time data */
 struct dw_dma_dev_data {
 	struct dma_context dma_ctx;
 	struct dw_drv_plat_data *channel_data;
 	struct dw_dma_chan_data chan[DW_MAX_CHAN];
+	struct dw_lli lli_pool[DW_MAX_CHAN][CONFIG_DMA_DW_LLI_POOL_SIZE] __aligned(64);
 
 	ATOMIC_DEFINE(channels_atomic, DW_MAX_CHAN);
 };

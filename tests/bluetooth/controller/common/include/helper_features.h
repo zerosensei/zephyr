@@ -165,7 +165,7 @@
 #define FEAT_PER_ADV_SYNC_RX 0x00
 #endif
 
-#if defined(CONFIG_MISSING)
+#if defined(CONFIG_BT_CTLR_SCA_UPDATE)
 #define FEAT_SLEEP_UPD 0x4000000
 #else
 #define FEAT_SLEEP_UPD 0x00
@@ -177,13 +177,13 @@
 #define FEAT_RPK_VALID 0x00
 #endif
 
-#if defined(CONFIG_MISSING)
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO)
 #define FEAT_ISO_CENTRAL 0x10000000
 #else
 #define FEAT_ISO_CENTRAL 0x00
 #endif
 
-#if defined(CONFIG_MISSING)
+#if defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
 #define FEAT_ISO_PERIPHERAL 0x20000000
 #else
 #define FEAT_ISO_PERIPHERAL 0x00
@@ -237,13 +237,8 @@
 
 /*
  * The following two are defined as per
- * Core Spec V5.2 Volume 6, Part B, chapter 4.6
- * LL_FEAT_BIT_MASK_VALID does not account for the bits
- * for the new features in V5.2
- * TODO: EXPECTED_FEAT_EXCH_VALID is not used at the moment
- *       but probably LL_FEAT_BIT_MASK_VALID should get this
- *       value in ll_feat.h
+ * Core Spec V5.3 Volume 6, Part B, chapter 4.6
  */
-#define EXPECTED_FEAT_EXCH_VALID 0x0000000FF787CF2F
+#define EXPECTED_FEAT_EXCH_VALID 0x000000EFF787CF2F
 #define FEAT_FILTER_OCTET0 0xFFFFFFFFFFFFFF00
 #define COMMON_FEAT_OCTET0(x) (FEAT_FILTER_OCTET0 | ((x) & ~FEAT_FILTER_OCTET0))

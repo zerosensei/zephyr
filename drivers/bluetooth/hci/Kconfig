@@ -15,7 +15,6 @@ config BT_H4
 	bool "H:4 UART"
 	select UART_INTERRUPT_DRIVEN
 	select BT_UART
-	select BT_RECV_IS_RX_THREAD
 	depends on SERIAL
 	help
 	  Bluetooth H:4 UART driver. Requires hardware flow control
@@ -33,6 +32,7 @@ config BT_H5
 
 config BT_RPMSG
 	bool "HCI using RPMsg"
+	select BT_HAS_HCI_VS
 	select IPC_SERVICE
 	select MBOX
 	help
@@ -70,6 +70,11 @@ config BT_ESP32
 	bool "ESP32 HCI driver"
 	help
 	  Espressif HCI bluetooth interface
+
+config BT_B91
+	bool "Telink B91 HCI driver"
+	help
+	  Telink B91 HCI bluetooth interface
 
 config BT_NO_DRIVER
 	bool "No default HCI driver"

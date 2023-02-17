@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -550,4 +550,31 @@ int lwm2m_string_to_path(const char *pathstr, struct lwm2m_obj_path *path,
 	}
 
 	return 0;
+}
+
+bool lwm2m_obj_path_equal(struct lwm2m_obj_path *a, struct lwm2m_obj_path *b)
+{
+	uint8_t level = a->level;
+
+	if (a->level != b->level) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_OBJECT && (a->obj_id != b->obj_id)) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_OBJECT_INST && (a->obj_inst_id != b->obj_inst_id)) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_RESOURCE && (a->res_id != b->res_id)) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_RESOURCE_INST && (a->res_inst_id != b->res_inst_id)) {
+		return false;
+	}
+
+	return true;
 }

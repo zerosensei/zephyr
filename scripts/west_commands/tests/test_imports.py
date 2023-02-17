@@ -21,9 +21,11 @@ def test_runner_imports():
                     'dediprog',
                     'dfu-util',
                     'esp32',
+                    'ezflashcli',
                     'gd32isp',
                     'hifive1',
-                    'intel_s1000',
+                    'intel_adsp',
+                    'intel_cyclonev',
                     'jlink',
                     'mdb-nsim',
                     'mdb-hw',
@@ -36,5 +38,6 @@ def test_runner_imports():
                     'spi_burn',
                     'stm32cubeprogrammer',
                     'stm32flash',
+                    'trace32',
                     'xtensa'))
     assert runner_names == expected

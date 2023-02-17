@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <zephyr.h>
+#include <zephyr/ztest.h>
+#include <zephyr/kernel.h>
 #include <errno.h>
+#include <zephyr/sys/errno_private.h>
 
 /**
  * @brief Test the thread context
@@ -54,7 +55,7 @@ static void errno_thread(void *_n, void *_my_errno, void *_unused)
 		result[n].pass = TC_PASS;
 	}
 
-	zassert_equal(errno, my_errno, NULL);
+	zassert_equal(errno, my_errno);
 
 	k_fifo_put(&fifo, &result[n]);
 }
@@ -67,7 +68,7 @@ static void errno_thread(void *_n, void *_my_errno, void *_unused)
  * @details Check whether variable value per-thread are saved during
  *	context switch
  */
-void test_thread_context(void)
+ZTEST(common_errno, test_thread_context)
 {
 	int rv = TC_PASS, test_errno;
 
@@ -96,7 +97,7 @@ void test_thread_context(void)
 		}
 	}
 
-	zassert_equal(errno, test_errno, NULL);
+	zassert_equal(errno, test_errno);
 
 	if (errno != errno_values[N_THREADS]) {
 		rv = TC_FAIL;
@@ -143,7 +144,7 @@ void thread_entry_user(void *p1, void *p2, void *p3)
  *
  * @ingroup kernel_threadcontext_tests
  */
-void test_errno(void)
+ZTEST_USER(common_errno, test_errno)
 {
 	k_tid_t tid;
 	uint32_t perm = K_INHERIT_PERMS;

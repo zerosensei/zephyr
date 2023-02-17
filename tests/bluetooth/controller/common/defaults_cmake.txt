@@ -6,7 +6,7 @@ include_directories(
   src
   ${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/include
   ${ZEPHYR_BASE}/tests/bluetooth/controller/common/include
-  ${ZEPHYR_BASE}/include/bluetooth
+  ${ZEPHYR_BASE}/include/zephyr/bluetooth
   ${ZEPHYR_BASE}/subsys/bluetooth
   ${ZEPHYR_BASE}/subsys/bluetooth/controller
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/util
@@ -29,9 +29,11 @@ FILE(GLOB ll_sw_sources
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp_enc.c
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp_conn_upd.c
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp_chmu.c
+  ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp_cc.c
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp.c
 	${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_conn.c
 	${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ll_addr.c
+	${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ll_feat.c
 )
 
 FILE(GLOB mock_sources
@@ -44,7 +46,9 @@ FILE(GLOB mock_sources
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/util.c
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ticker.c
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ull.c
+	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ull_conn_iso.c
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ull_peripheral.c
+	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ull_peripheral_iso.c
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ull_central.c
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/ull_scan.c
 	${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl/src/lll_clock.c

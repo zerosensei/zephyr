@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 set_property(TARGET linker PROPERTY devices_start_symbol "__device_start")
 
-find_program(CMAKE_LINKER ${CROSS_COMPILE}lldac PATH ${TOOLCHAIN_HOME} NO_DEFAULT_PATH)
+find_program(CMAKE_LINKER ${CROSS_COMPILE}lldac PATHS ${TOOLCHAIN_HOME} NO_DEFAULT_PATH)
 
 # the prefix to transfer linker options from compiler
 set_ifndef(LINKERFLAGPREFIX -Wl,)
@@ -175,19 +175,19 @@ endmacro()
 # generate linker script snippets from configure files
 macro(toolchain_ld_configure_files)
   configure_file(
-       $ENV{ZEPHYR_BASE}/include/arch/common/app_data_alignment.ld
+       $ENV{ZEPHYR_BASE}/include/zephyr/arch/common/app_data_alignment.ld
        ${PROJECT_BINARY_DIR}/include/generated/app_data_alignment.ld)
 
   configure_file(
-       $ENV{ZEPHYR_BASE}/include/linker/app_smem.ld
+       $ENV{ZEPHYR_BASE}/include/zephyr/linker/app_smem.ld
        ${PROJECT_BINARY_DIR}/include/generated/app_smem.ld)
 
   configure_file(
-       $ENV{ZEPHYR_BASE}/include/linker/app_smem_aligned.ld
+       $ENV{ZEPHYR_BASE}/include/zephyr/linker/app_smem_aligned.ld
        ${PROJECT_BINARY_DIR}/include/generated/app_smem_aligned.ld)
 
   configure_file(
-       $ENV{ZEPHYR_BASE}/include/linker/app_smem_unaligned.ld
+       $ENV{ZEPHYR_BASE}/include/zephyr/linker/app_smem_unaligned.ld
        ${PROJECT_BINARY_DIR}/include/generated/app_smem_unaligned.ld)
 endmacro()
 
@@ -211,7 +211,7 @@ macro(toolchain_ld_relocation)
     OUTPUT ${MEM_RELOCATION_CODE} ${MEM_RELOCATION_LD}
     COMMAND
     ${PYTHON_EXECUTABLE}
-    ${ZEPHYR_BASE}/scripts/gen_relocate_app.py
+    ${ZEPHYR_BASE}/scripts/build/gen_relocate_app.py
     $<$<BOOL:${CMAKE_VERBOSE_MAKEFILE}>:--verbose>
     -d ${APPLICATION_BINARY_DIR}
     -i \"$<TARGET_PROPERTY:code_data_relocation_target,COMPILE_DEFINITIONS>\"

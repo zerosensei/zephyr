@@ -12,12 +12,13 @@
  * that the definition of BIT is not overridden */
 #include <driverlib/gpio.h>
 
-#include <drivers/uart.h>
+#include <zephyr/drivers/uart.h>
 
 /* Driverlib includes */
 #include <driverlib/rom.h>
 #include <driverlib/rom_map.h>
 #include <driverlib/uart.h>
+#include <zephyr/irq.h>
 
 struct uart_msp432p4xx_config {
 	unsigned long base;

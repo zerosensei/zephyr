@@ -22,6 +22,8 @@ config CPU_ATOM
 	select X86_CPU_HAS_SSE
 	select X86_CPU_HAS_SSE2
 	select X86_CPU_HAS_SSE3
+	select CPU_HAS_DCACHE
+	select CPU_HAS_ICACHE
 	help
 	  This option signifies the use of a CPU from the Atom family.
 
@@ -38,6 +40,8 @@ config CPU_APOLLO_LAKE
 	select X86_CPU_HAS_SSSE3
 	select X86_CPU_HAS_SSE41
 	select X86_CPU_HAS_SSE42
+	select CPU_HAS_DCACHE
+	select CPU_HAS_ICACHE
 	help
 	  This option signifies the use of a CPU from the Apollo Lake family.
 
@@ -51,6 +55,8 @@ config CPU_LAKEMONT
 	select X86_CPU_HAS_SSE2
 	select X86_CPU_HAS_SSE3
 	select X86_CPU_HAS_SSSE3
+	select CPU_HAS_DCACHE
+	select CPU_HAS_ICACHE
 	help
 	  This option signifies the use of a CPU from the Lakemont family.
 
@@ -293,24 +299,6 @@ config MULTIBOOT_MEMMAP
 	help
 	  Use the multiboot memory map if the loader provides one.
 
-config MULTIBOOT_FRAMEBUF
-	bool "Multiboot framebuffer support"
-	select DISPLAY
-	select FRAMEBUF_DISPLAY
-	select MULTIBOOT_INFO
-
-if MULTIBOOT_FRAMEBUF
-
-config MULTIBOOT_FRAMEBUF_X
-	int "Multiboot framebuffer X pixels"
-	default 640
-
-config MULTIBOOT_FRAMEBUF_Y
-	int "Multiboot framebuffer Y pixels"
-	default 480
-
-endif # MULTIBOOT_FRAMEBUF
-
 endif # MULTIBOOT
 
 config EXCEPTION_DEBUG
@@ -326,7 +314,6 @@ config EXCEPTION_DEBUG
 config X86_VERY_EARLY_CONSOLE
 	bool "Support very early boot printk"
 	depends on PRINTK
-	default y
 	help
 	  Non-emulated X86 devices often require special hardware to attach
 	  a debugger, which may not be easily available. This option adds a
@@ -486,6 +473,22 @@ config X86_EFI
 	help
 	  Enable EFI support. This means you build your image with zefi
 	  support. See arch/x86/zefi/README.txt for more information.
+
+config X86_EFI_CONSOLE
+	bool
+	depends on X86_EFI && X86_64 && !X86_VERY_EARLY_CONSOLE
+	select EFI_CONSOLE
+	default y
+	help
+	  This enables the use of the UEFI console device as the
+	  Zephyr printk handler.  It requires that no interferences
+	  with hardware used by the firmware console (e.g. a UART or
+	  framebuffer) happens from Zephyr code, and that all memory
+	  used by the firmware environment and its page tables be
+	  separate and preserved.  In general this is safe to assume,
+	  but no automatic checking exists at runtime to verify.
+	  Likewise be sure to disable any other console/printk
+	  drivers!
 
 source "arch/x86/core/Kconfig.ia32"
 source "arch/x86/core/Kconfig.intel64"

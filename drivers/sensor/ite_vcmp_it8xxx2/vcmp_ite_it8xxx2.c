@@ -6,18 +6,18 @@
 
 #define DT_DRV_COMPAT ite_it8xxx2_vcmp
 
-#include <device.h>
-#include <devicetree/io-channels.h>
-#include <drivers/adc.h>
-#include <drivers/sensor.h>
-#include <drivers/sensor/it8xxx2_vcmp.h>
-#include <dt-bindings/dt-util.h>
-#include <dt-bindings/sensor/it8xxx2_vcmp.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree/io-channels.h>
+#include <zephyr/drivers/adc.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/sensor/it8xxx2_vcmp.h>
+#include <zephyr/dt-bindings/dt-util.h>
+#include <zephyr/dt-bindings/sensor/it8xxx2_vcmp.h>
 #include <errno.h>
 #include <soc.h>
 #include <soc_dt.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(vcmp_ite_it8xxx2, CONFIG_SENSOR_LOG_LEVEL);
 
 #define VCMP_REG_MASK		0x7
@@ -42,8 +42,6 @@ struct vcmp_it8xxx2_config {
 	volatile uint8_t *reg_vcmpsts2;
 	/* Voltage comparator module irq */
 	int irq;
-	/* Voltage comparator module irq config function */
-	void (*irq_cfg_func)(void);
 	/* Voltage comparator channel */
 	int vcmp_ch;
 	/* Scan period for "all voltage comparator channel" */
@@ -322,11 +320,20 @@ static int vcmp_it8xxx2_init(const struct device *dev)
 		vcmp_ite_it8xxx2_attr_set(dev, SENSOR_CHAN_VOLTAGE, attr, &val);
 	}
 
-	ite_intc_isr_clear(config->irq);
+	/*
+	 * All voltage comparator channels share one irq interrupt,
+	 * so if the irq is enabled before, we needn't to enable again.
+	 * And we will figure out the triggered channel in vcmp_it8xxx2_isr().
+	 */
+	if (!irq_is_enabled(config->irq)) {
+		ite_intc_isr_clear(config->irq);
 
-	config->irq_cfg_func();
+		irq_connect_dynamic(config->irq, 0,
+				    (void (*)(const void *))vcmp_it8xxx2_isr,
+				    (const void *)dev, 0);
 
-	irq_enable(config->irq);
+		irq_enable(config->irq);
+	}
 
 	return 0;
 }
@@ -338,15 +345,6 @@ static const struct sensor_driver_api vcmp_ite_it8xxx2_api = {
 };
 
 #define VCMP_IT8XXX2_INIT(inst)								\
-	static void vcmp_it8xxx2_irq_cfg_func_##inst(void)				\
-	{										\
-		IRQ_CONNECT(DT_INST_IRQN(inst),						\
-			    0,								\
-			    vcmp_it8xxx2_isr,						\
-			    DEVICE_DT_INST_GET(inst),					\
-			    0);								\
-	}										\
-											\
 	static const struct vcmp_it8xxx2_config vcmp_it8xxx2_cfg_##inst = {		\
 		.reg_vcmpxctl = (uint8_t *)DT_INST_REG_ADDR_BY_IDX(inst, 0),		\
 		.reg_vcmpxcselm = (uint8_t *)DT_INST_REG_ADDR_BY_IDX(inst, 1),		\
@@ -356,7 +354,6 @@ static const struct sensor_driver_api vcmp_ite_it8xxx2_api = {
 		.reg_vcmpsts = (uint8_t *)DT_INST_REG_ADDR_BY_IDX(inst, 5),		\
 		.reg_vcmpsts2 = (uint8_t *)DT_INST_REG_ADDR_BY_IDX(inst, 6),		\
 		.irq = DT_INST_IRQN(inst),						\
-		.irq_cfg_func = vcmp_it8xxx2_irq_cfg_func_##inst,			\
 		.vcmp_ch = DT_INST_PROP(inst, vcmp_ch),					\
 		.scan_period = DT_INST_PROP(inst, scan_period),				\
 		.comparison = DT_INST_PROP(inst, comparison),				\
@@ -371,7 +368,7 @@ static const struct sensor_driver_api vcmp_ite_it8xxx2_api = {
 		.adc_ch_cfg.channel_id = (uint8_t)DT_INST_IO_CHANNELS_INPUT(inst),	\
 	};										\
 											\
-	DEVICE_DT_INST_DEFINE(inst,							\
+	SENSOR_DEVICE_DT_INST_DEFINE(inst,						\
 			      vcmp_it8xxx2_init,					\
 			      NULL,							\
 			      &vcmp_it8xxx2_data_##inst,				\

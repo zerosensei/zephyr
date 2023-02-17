@@ -11,14 +11,14 @@
  * @brief LP503x LED controller
  */
 
-#include <drivers/i2c.h>
-#include <drivers/led.h>
-#include <drivers/led/lp503x.h>
-#include <device.h>
-#include <zephyr.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/led.h>
+#include <zephyr/drivers/led/lp503x.h>
+#include <zephyr/device.h>
+#include <zephyr/kernel.h>
 
 #define LOG_LEVEL CONFIG_LED_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(lp503x);
 
 #define LP503X_DEVICE_CONFIG0		0
@@ -235,7 +235,7 @@ const uint8_t color_mapping_##led_node_id[] =			\
 
 #define LED_INFO(led_node_id)					\
 {								\
-	.label		= DT_LABEL(led_node_id),		\
+	.label		= DT_PROP(led_node_id, label),		\
 	.index		= DT_PROP(led_node_id, index),		\
 	.num_colors	=					\
 		DT_PROP_LEN(led_node_id, color_mapping),	\

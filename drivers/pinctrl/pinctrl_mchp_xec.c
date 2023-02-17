@@ -9,7 +9,7 @@
 
 #define DT_DRV_COMPAT microchip_xec_pinctrl
 
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/pinctrl.h>
 #include <soc.h>
 
 /* Microchip XEC: each GPIO pin has two 32-bit control register.
@@ -72,10 +72,12 @@ static int xec_config_pin(uint32_t portpin, uint32_t conf, uint32_t altf)
 
 	config_drive_slew(regs, idx, conf);
 
-	/* default input pad enabled, buffer type push-pull, no internal pulls */
+	/* default input pad enabled, buffer type push-pull, no internal pulls,
+	 * and invert polarity normal.
+	 */
 	msk |= (BIT(MCHP_GPIO_CTRL_INPAD_DIS_POS) | MCHP_GPIO_CTRL_BUFT_MASK |
-			MCHP_GPIO_CTRL_PUD_MASK | MCHP_GPIO_CTRL_DIR_MASK |
-			MCHP_GPIO_CTRL_MUX_MASK);
+			MCHP_GPIO_CTRL_PUD_MASK | MCHP_GPIO_CTRL_MUX_MASK
+			| BIT(MCHP_GPIO_CTRL_POL_POS));
 
 	if (conf & BIT(MCHP_XEC_PIN_LOW_POWER_POS)) {
 		msk |= MCHP_GPIO_CTRL_PWRG_MASK;
@@ -100,6 +102,10 @@ static int xec_config_pin(uint32_t portpin, uint32_t conf, uint32_t altf)
 
 	if ((conf >> MCHP_XEC_OTYPER_POS) & MCHP_XEC_OTYPER_MASK) {
 		val |= MCHP_GPIO_CTRL_BUFT_OPENDRAIN;
+	}
+
+	if (conf & MCHP_XEC_FUNC_INV_MSK) {
+		val |= BIT(MCHP_GPIO_CTRL_POL_POS);
 	}
 
 	regs->CTRL[idx] = (regs->CTRL[idx] & ~msk) | val;

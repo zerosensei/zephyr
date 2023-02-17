@@ -6,9 +6,9 @@
 
 #define DT_DRV_COMPAT ti_cc32xx_uart
 
-#include <kernel.h>
-#include <arch/cpu.h>
-#include <drivers/uart.h>
+#include <zephyr/kernel.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/drivers/uart.h>
 
 /* Driverlib includes */
 #include <inc/hw_types.h>
@@ -16,6 +16,7 @@
 #include <driverlib/rom_map.h>
 #include <driverlib/prcm.h>
 #include <driverlib/uart.h>
+#include <zephyr/irq.h>
 
 struct uart_cc32xx_dev_config {
 	unsigned long base;

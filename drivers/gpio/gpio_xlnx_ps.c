@@ -6,16 +6,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <devicetree.h>
-
-#include <drivers/gpio.h>
-#include "gpio_utils.h"
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/irq.h>
+#include <zephyr/drivers/gpio/gpio_utils.h>
 #include "gpio_xlnx_ps.h"
 #include "gpio_xlnx_ps_bank.h"
 
 #define LOG_MODULE_NAME gpio_xlnx_ps
 #define LOG_LEVEL CONFIG_GPIO_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define DT_DRV_COMPAT xlnx_ps_gpio
@@ -94,11 +94,10 @@ static void gpio_xlnx_ps_isr(const struct device *dev)
  * devices for the parent controller device's config data struct
  * specified in the device tree.
  */
-#define GPIO_XLNX_PS_CHILD_CONCAT(idx) DEVICE_DT_GET(idx),
 
 #define GPIO_XLNX_PS_GEN_BANK_ARRAY(idx)\
-static const struct device *gpio_xlnx_ps##idx##_banks[] = {\
-	DT_FOREACH_CHILD_STATUS_OKAY(DT_DRV_INST(idx), GPIO_XLNX_PS_CHILD_CONCAT)\
+static const struct device *const gpio_xlnx_ps##idx##_banks[] = {\
+	DT_INST_FOREACH_CHILD_STATUS_OKAY_SEP(idx, DEVICE_DT_GET, (,))\
 };
 
 /* Device config & run-time data struct creation macros */

@@ -4,17 +4,58 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/can.h>
-#include <kernel.h>
-#include <sys/util.h>
-#include <logging/log.h>
+#include <zephyr/drivers/can.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(can_common, CONFIG_CAN_LOG_LEVEL);
+
+/* Maximum acceptable deviation in sample point location (permille) */
+#define SAMPLE_POINT_MARGIN 50
 
 /* CAN sync segment is always one time quantum */
 #define CAN_SYNC_SEG 1
 
-static void can_msgq_put(const struct device *dev, struct zcan_frame *frame, void *user_data)
+struct can_tx_default_cb_ctx {
+	struct k_sem done;
+	int status;
+};
+
+static void can_tx_default_cb(const struct device *dev, int error, void *user_data)
+{
+	struct can_tx_default_cb_ctx *ctx = user_data;
+
+	ctx->status = error;
+	k_sem_give(&ctx->done);
+}
+
+int z_impl_can_send(const struct device *dev, const struct can_frame *frame,
+		    k_timeout_t timeout, can_tx_callback_t callback,
+		    void *user_data)
+{
+	const struct can_driver_api *api = (const struct can_driver_api *)dev->api;
+
+	if (callback == NULL) {
+		struct can_tx_default_cb_ctx ctx;
+		int err;
+
+		k_sem_init(&ctx.done, 0, 1);
+
+		err = api->send(dev, frame, timeout, can_tx_default_cb, &ctx);
+		if (err != 0) {
+			return err;
+		}
+
+		k_sem_take(&ctx.done, K_FOREVER);
+
+		return ctx.status;
+	}
+
+	return api->send(dev, frame, timeout, callback, user_data);
+}
+
+static void can_msgq_put(const struct device *dev, struct can_frame *frame, void *user_data)
 {
 	struct k_msgq *msgq = (struct k_msgq *)user_data;
 	int ret;
@@ -30,7 +71,7 @@ static void can_msgq_put(const struct device *dev, struct zcan_frame *frame, voi
 }
 
 int z_impl_can_add_rx_filter_msgq(const struct device *dev, struct k_msgq *msgq,
-				  const struct zcan_filter *filter)
+				  const struct can_filter *filter)
 {
 	const struct can_driver_api *api = dev->api;
 
@@ -85,9 +126,7 @@ static int can_calc_timing_int(uint32_t core_clock, struct can_timing *res,
 	int sp_err;
 	struct can_timing tmp_res;
 
-	if (bitrate == 0 || sp >= 1000 ||
-	    (!IS_ENABLED(CONFIG_CAN_FD_MODE) && bitrate > 1000000) ||
-	     (IS_ENABLED(CONFIG_CAN_FD_MODE) && bitrate > 8000000)) {
+	if (bitrate == 0 || sp >= 1000) {
 		return -EINVAL;
 	}
 
@@ -124,9 +163,8 @@ static int can_calc_timing_int(uint32_t core_clock, struct can_timing *res,
 		LOG_DBG("SP error: %d 1/1000", sp_err_min);
 	}
 
-	return sp_err_min == UINT16_MAX ? -EINVAL : (int)sp_err_min;
+	return sp_err_min == UINT16_MAX ? -ENOTSUP : (int)sp_err_min;
 }
-
 
 int z_impl_can_calc_timing(const struct device *dev, struct can_timing *res,
 			   uint32_t bitrate, uint16_t sample_pnt)
@@ -135,6 +173,10 @@ int z_impl_can_calc_timing(const struct device *dev, struct can_timing *res,
 	const struct can_timing *max = can_get_timing_max(dev);
 	uint32_t core_clock;
 	int ret;
+
+	if (bitrate > 1000000) {
+		return -EINVAL;
+	}
 
 	ret = can_get_core_clock(dev, &core_clock);
 	if (ret != 0) {
@@ -148,10 +190,14 @@ int z_impl_can_calc_timing(const struct device *dev, struct can_timing *res,
 int z_impl_can_calc_timing_data(const struct device *dev, struct can_timing *res,
 				uint32_t bitrate, uint16_t sample_pnt)
 {
-	const struct can_timing *min = can_get_timing_min_data(dev);
-	const struct can_timing *max = can_get_timing_max_data(dev);
+	const struct can_timing *min = can_get_timing_data_min(dev);
+	const struct can_timing *max = can_get_timing_data_max(dev);
 	uint32_t core_clock;
 	int ret;
+
+	if (bitrate > 8000000) {
+		return -EINVAL;
+	}
 
 	ret = can_get_core_clock(dev, &core_clock);
 	if (ret != 0) {
@@ -180,13 +226,35 @@ int can_calc_prescaler(const struct device *dev, struct can_timing *timing,
 	return core_clock % (ts * timing->prescaler);
 }
 
-int can_set_bitrate(const struct device *dev, uint32_t bitrate, uint32_t bitrate_data)
+/**
+ * @brief Get the sample point location for a given bitrate
+ *
+ * @param  bitrate The bitrate in bits/second.
+ * @return The sample point in permille.
+ */
+uint16_t sample_point_for_bitrate(uint32_t bitrate)
+{
+	uint16_t sample_pnt;
+
+	if (bitrate > 800000) {
+		/* 75.0% */
+		sample_pnt = 750;
+	} else if (bitrate > 500000) {
+		/* 80.0% */
+		sample_pnt = 800;
+	} else {
+		/* 87.5% */
+		sample_pnt = 875;
+	}
+
+	return sample_pnt;
+}
+
+int z_impl_can_set_bitrate(const struct device *dev, uint32_t bitrate)
 {
 	struct can_timing timing;
-#ifdef CONFIG_CAN_FD_MODE
-	struct can_timing timing_data;
-#endif /* CONFIG_CAN_FD_MODE */
 	uint32_t max_bitrate;
+	uint16_t sample_pnt;
 	int ret;
 
 	ret = can_get_max_bitrate(dev, &max_bitrate);
@@ -201,27 +269,53 @@ int can_set_bitrate(const struct device *dev, uint32_t bitrate, uint32_t bitrate
 		return -ENOTSUP;
 	}
 
-	ret = can_calc_timing(dev, &timing, bitrate, 875);
+	sample_pnt = sample_point_for_bitrate(bitrate);
+	ret = can_calc_timing(dev, &timing, bitrate, sample_pnt);
 	if (ret < 0) {
-		return -EINVAL;
+		return ret;
+	}
+
+	if (ret > SAMPLE_POINT_MARGIN) {
+		return -ERANGE;
 	}
 
 	timing.sjw = CAN_SJW_NO_CHANGE;
 
+	return can_set_timing(dev, &timing);
+}
+
 #ifdef CONFIG_CAN_FD_MODE
+int z_impl_can_set_bitrate_data(const struct device *dev, uint32_t bitrate_data)
+{
+	struct can_timing timing_data;
+	uint32_t max_bitrate;
+	uint16_t sample_pnt;
+	int ret;
+
+	ret = can_get_max_bitrate(dev, &max_bitrate);
+	if (ret == -ENOSYS) {
+		/* Maximum bitrate unknown */
+		max_bitrate = 0;
+	} else if (ret < 0) {
+		return ret;
+	}
+
 	if ((max_bitrate > 0) && (bitrate_data > max_bitrate)) {
 		return -ENOTSUP;
 	}
 
-	ret = can_calc_timing_data(dev, &timing_data, bitrate_data, 875);
+	sample_pnt = sample_point_for_bitrate(bitrate_data);
+	ret = can_calc_timing_data(dev, &timing_data, bitrate_data, sample_pnt);
 	if (ret < 0) {
-		return -EINVAL;
+		return ret;
+	}
+
+	if (ret > SAMPLE_POINT_MARGIN) {
+		return -ERANGE;
 	}
 
 	timing_data.sjw = CAN_SJW_NO_CHANGE;
 
-	return can_set_timing(dev, &timing, &timing_data);
-#else /* CONFIG_CAN_FD_MODE */
-	return can_set_timing(dev, &timing, NULL);
-#endif /* !CONFIG_CAN_FD_MODE */
+	return can_set_timing_data(dev, &timing_data);
 }
+#endif /* CONFIG_CAN_FD_MODE */

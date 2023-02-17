@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <audio/dmic.h>
-#include <drivers/clock_control/nrf_clock_control.h>
-#include <drivers/pinctrl.h>
+#include <zephyr/audio/dmic.h>
+#include <zephyr/drivers/clock_control/nrf_clock_control.h>
+#include <zephyr/drivers/pinctrl.h>
 #include <soc.h>
 #include <nrfx_pdm.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(dmic_nrfx_pdm, CONFIG_AUDIO_DMIC_LOG_LEVEL);
 
 struct dmic_nrfx_pdm_drv_data {
@@ -94,8 +95,8 @@ static void event_handler(const struct device *dev, const nrfx_pdm_evt_t *evt)
 	}
 
 	if (stop) {
-		nrfx_pdm_stop();
 		drv_data->stopping = true;
+		nrfx_pdm_stop();
 	}
 }
 
@@ -460,8 +461,8 @@ static int dmic_nrfx_pdm_trigger(const struct device *dev,
 	case DMIC_TRIGGER_PAUSE:
 	case DMIC_TRIGGER_STOP:
 		if (drv_data->active) {
-			nrfx_pdm_stop();
 			drv_data->stopping = true;
+			nrfx_pdm_stop();
 		}
 		break;
 

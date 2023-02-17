@@ -8,25 +8,25 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <init.h>
-#include <sys/printk.h>
-#include <sys/byteorder.h>
-#include <zephyr.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/l2cap.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/l2cap.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
 
-#include <sys/check.h>
+#include <zephyr/sys/check.h>
 
-#include <bluetooth/services/ots.h>
+#include <zephyr/bluetooth/services/ots.h>
 #include "ots_internal.h"
 #include "ots_obj_manager_internal.h"
 #include "ots_dir_list_internal.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 
@@ -40,6 +40,12 @@ LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 #define OACP_FEAT_BIT_DELETE BIT(BT_OTS_OACP_FEAT_DELETE)
 #else
 #define OACP_FEAT_BIT_DELETE 0
+#endif
+
+#if defined(BT_OTS_OACP_CHECKSUM_SUPPORT)
+#define OACP_FEAT_BIT_CRC BIT(BT_OTS_OACP_FEAT_CHECKSUM)
+#else
+#define OACP_FEAT_BIT_CRC 0
 #endif
 
 #if defined(CONFIG_BT_OTS_OACP_READ_SUPPORT)
@@ -64,6 +70,7 @@ LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 #define OACP_FEAT (		\
 	OACP_FEAT_BIT_CREATE |	\
 	OACP_FEAT_BIT_DELETE |	\
+	OACP_FEAT_BIT_CRC |     \
 	OACP_FEAT_BIT_READ |	\
 	OACP_FEAT_BIT_WRITE |	\
 	OACP_FEAT_BIT_PATCH)
@@ -187,13 +194,13 @@ ssize_t ots_obj_name_write(struct bt_conn *conn,
 		rc = bt_gatt_ots_obj_manager_next_obj_get(ots->obj_manager, obj, &obj);
 	}
 
-	/* Update real object name after no duplicate detected */
-	strcpy(ots->cur_obj->metadata.name, name);
-
+	/* No duplicate detected, notify application and update real object name */
 	if (ots->cb->obj_name_written) {
 		ots->cb->obj_name_written(ots, conn, ots->cur_obj->id,
-					  ots->cur_obj->metadata.name);
+					  ots->cur_obj->metadata.name, name);
 	}
+
+	strcpy(ots->cur_obj->metadata.name, name);
 
 	return len;
 }
@@ -265,7 +272,7 @@ static ssize_t ots_obj_id_read(struct bt_conn *conn,
 
 	bt_ots_obj_id_to_str(ots->cur_obj->id, id_str,
 				      sizeof(id_str));
-	LOG_DBG("Current Object ID: %s", log_strdup(id_str));
+	LOG_DBG("Current Object ID: %s", id_str);
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, id, sizeof(id));
 }
@@ -443,6 +450,10 @@ int bt_ots_init(struct bt_ots *ots,
 	__ASSERT(ots_init->cb->obj_deleted ||
 		 !BT_OTS_OACP_GET_FEAT_CREATE(ots_init->features.oacp),
 		 "Callback for object deletion is not set and object creation is enabled");
+#if defined(CONFIG_BT_OTS_OACP_CHECKSUM_SUPPORT)
+	__ASSERT(ots_init->cb->obj_cal_checksum,
+		 "Callback for object calculate checksum is not set");
+#endif
 	__ASSERT(ots_init->cb->obj_read ||
 		 !BT_OTS_OACP_GET_FEAT_READ(ots_init->features.oacp),
 		 "Callback for object reading is not set");
@@ -575,7 +586,7 @@ static void ots_delete_empty_name_objects(struct bt_ots *ots, struct bt_conn *co
 
 		if (strlen(obj->metadata.name) == 0) {
 			bt_ots_obj_id_to_str(obj->id, id_str, sizeof(id_str));
-			LOG_DBG("Deleting object with %s ID due to empty name", log_strdup(id_str));
+			LOG_DBG("Deleting object with %s ID due to empty name", id_str);
 
 			if (ots->cb && ots->cb->obj_deleted) {
 				ots->cb->obj_deleted(ots, conn, obj->id);
@@ -583,7 +594,7 @@ static void ots_delete_empty_name_objects(struct bt_ots *ots, struct bt_conn *co
 
 			if (bt_gatt_ots_obj_manager_obj_delete(obj)) {
 				LOG_ERR("Failed to remove object with %s ID from object manager",
-					log_strdup(id_str));
+					id_str);
 			}
 		}
 	}

@@ -6,10 +6,11 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
-#include <toolchain.h>
+#include <zephyr/toolchain.h>
 #include <soc.h>
-#include <sys/util.h>
+#include <zephyr/sys/util.h>
 
 #include "hal/cpu.h"
 #include "hal/ccm.h"
@@ -20,6 +21,7 @@
 #include "util/memq.h"
 #include "util/mfifo.h"
 
+#include "pdu_vendor.h"
 #include "pdu.h"
 
 #include "lll.h"
@@ -30,8 +32,6 @@
 #include "lll_tim_internal.h"
 #include "lll_prof_internal.h"
 
-#define LOG_MODULE_NAME bt_ctlr_llsw_openisa_lll_conn
-#include "common/log.h"
 #include "hal/debug.h"
 
 static int init_reset(void);
@@ -405,11 +405,7 @@ void lll_conn_isr_tx(void *param)
 void lll_conn_isr_abort(void *param)
 {
 	/* Clear radio status and events */
-	radio_status_reset();
-	radio_tmr_status_reset();
-	radio_filter_status_reset();
-	radio_ar_status_reset();
-	radio_rssi_status_reset();
+	lll_isr_status_reset();
 
 	if (IS_ENABLED(HAL_RADIO_GPIO_HAVE_PA_PIN) ||
 	    IS_ENABLED(HAL_RADIO_GPIO_HAVE_LNA_PIN)) {
@@ -574,11 +570,7 @@ static void isr_done(void *param)
 
 	/* TODO: MOVE to a common interface, isr_lll_radio_status? */
 	/* Clear radio status and events */
-	radio_status_reset();
-	radio_tmr_status_reset();
-	radio_filter_status_reset();
-	radio_ar_status_reset();
-	radio_rssi_status_reset();
+	lll_isr_status_reset();
 
 #if defined(HAL_RADIO_GPIO_HAVE_PA_PIN) || \
 	defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)

@@ -3,16 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <kernel.h>
-#include <irq_offload.h>
+#include <zephyr/kernel.h>
+#include <zephyr/irq_offload.h>
 #include <zsr.h>
+#include <zephyr/irq.h>
 
 #define CURR_CPU (IS_ENABLED(CONFIG_SMP) ? arch_curr_cpu()->id : 0)
 
 static struct {
 	irq_offload_routine_t fn;
 	const void *arg;
-} offload_params[CONFIG_MP_NUM_CPUS];
+} offload_params[CONFIG_MP_MAX_NUM_CPUS];
 
 static void irq_offload_isr(const void *param)
 {

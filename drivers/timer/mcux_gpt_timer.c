@@ -6,13 +6,13 @@
 
 #define DT_DRV_COMPAT nxp_gpt_hw_timer
 
-#include <device.h>
-#include <drivers/timer/system_timer.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/timer/system_timer.h>
 #include <fsl_gpt.h>
-#include <sys_clock.h>
-#include <spinlock.h>
-#include <sys/time_units.h>
-
+#include <zephyr/sys_clock.h>
+#include <zephyr/spinlock.h>
+#include <zephyr/sys/time_units.h>
+#include <zephyr/irq.h>
 
 
 /* GPT is a 32 bit counter, but we use a lower value to avoid integer overflow */

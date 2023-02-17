@@ -6,20 +6,22 @@
 
 #define DT_DRV_COMPAT st_stm32_window_watchdog
 
-#include <drivers/watchdog.h>
+#include <zephyr/drivers/watchdog.h>
 #include <soc.h>
 #include <stm32_ll_bus.h>
 #include <stm32_ll_wwdg.h>
 #include <stm32_ll_system.h>
 #include <errno.h>
-#include <sys/__assert.h>
-#include <drivers/clock_control/stm32_clock_control.h>
-#include <drivers/clock_control.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/drivers/clock_control/stm32_clock_control.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/irq.h>
+#include <zephyr/sys_clock.h>
 
 #include "wdt_wwdg_stm32.h"
 
 #define LOG_LEVEL CONFIG_WDT_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(wdt_wwdg_stm32);
 
 #define WWDG_INTERNAL_DIVIDER   4096U
@@ -87,7 +89,7 @@ static void wwdg_stm32_irq_config(const struct device *dev);
 
 static uint32_t wwdg_stm32_get_pclk(const struct device *dev)
 {
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	const struct wwdg_stm32_config *cfg = WWDG_STM32_CFG(dev);
 	uint32_t pclk_rate;
 
@@ -277,10 +279,15 @@ static const struct wdt_driver_api wwdg_stm32_api = {
 
 static int wwdg_stm32_init(const struct device *dev)
 {
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	const struct wwdg_stm32_config *cfg = WWDG_STM32_CFG(dev);
 
 	wwdg_stm32_irq_config(dev);
+
+	if (!device_is_ready(clk)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
 
 	return clock_control_on(clk, (clock_control_subsys_t *) &cfg->pclken);
 }

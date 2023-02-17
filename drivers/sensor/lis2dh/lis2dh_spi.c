@@ -12,7 +12,7 @@
 
 #include <string.h>
 #include "lis2dh.h"
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
 
@@ -155,7 +155,7 @@ int lis2dh_spi_init(const struct device *dev)
 
 	data->hw_tf = &lis2dh_spi_transfer_fn;
 
-	if (!spi_is_ready(&cfg->bus_cfg.spi)) {
+	if (!spi_is_ready_dt(&cfg->bus_cfg.spi)) {
 		LOG_ERR("SPI bus is not ready");
 		return -ENODEV;
 	}

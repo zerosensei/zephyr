@@ -3,10 +3,10 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <zephyr.h>
-#include <pm/pm.h>
+#include <zephyr/kernel.h>
+#include <zephyr/pm/pm.h>
 #include <soc.h>
-#include <init.h>
+#include <zephyr/init.h>
 
 #include <stm32l5xx_ll_utils.h>
 #include <stm32l5xx_ll_bus.h>
@@ -15,9 +15,9 @@
 #include <stm32l5xx_ll_rcc.h>
 #include <stm32l5xx_ll_system.h>
 #include <clock_control/clock_stm32_ll_common.h>
-#include <drivers/clock_control/stm32_clock_control.h>
+#include <zephyr/drivers/clock_control/stm32_clock_control.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(soc, CONFIG_SOC_LOG_LEVEL);
 
 /* select MSI as wake-up system clock if configured, HSI otherwise */
@@ -35,42 +35,34 @@ __weak void pm_state_set(enum pm_state state, uint8_t substate_id)
 		return;
 	}
 
+	/* ensure the proper wake-up system clock */
+	LL_RCC_SetClkAfterWakeFromStop(RCC_STOP_WAKEUPCLOCK_SELECTED);
+
 	switch (substate_id) {
 	case 1: /* this corresponds to the STOP0 mode: */
-		/* ensure the proper wake-up system clock */
-		LL_RCC_SetClkAfterWakeFromStop(RCC_STOP_WAKEUPCLOCK_SELECTED);
 		/* enter STOP0 mode */
 		LL_PWR_SetPowerMode(LL_PWR_MODE_STOP0);
-		LL_LPM_EnableDeepSleep();
-		/* enter SLEEP mode : WFE or WFI */
-		k_cpu_idle();
 		break;
 	case 2: /* this corresponds to the STOP1 mode: */
-		/* ensure the proper wake-up system clock */
-		LL_RCC_SetClkAfterWakeFromStop(RCC_STOP_WAKEUPCLOCK_SELECTED);
 		/* enter STOP1 mode */
 		LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
-		LL_LPM_EnableDeepSleep();
-		/* enter SLEEP mode : WFE or WFI */
-		k_cpu_idle();
 		break;
 	case 3: /* this corresponds to the STOP2 mode: */
-		/* ensure the proper wake-up system clock */
-		LL_RCC_SetClkAfterWakeFromStop(RCC_STOP_WAKEUPCLOCK_SELECTED);
 #ifdef PWR_CR1_RRSTP
 		LL_PWR_DisableSRAM3Retention();
 #endif /* PWR_CR1_RRSTP */
 		/* enter STOP2 mode */
 		LL_PWR_SetPowerMode(LL_PWR_MODE_STOP2);
-		LL_LPM_EnableDeepSleep();
-		/* enter SLEEP mode : WFE or WFI */
-		k_cpu_idle();
 		break;
 	default:
 		LOG_DBG("Unsupported power state substate-id %u",
 			substate_id);
 		break;
 	}
+
+	LL_LPM_EnableDeepSleep();
+	/* enter SLEEP mode : WFE or WFI */
+	k_cpu_idle();
 }
 
 /* Handle SOC specific activity after Low Power Mode Exit */

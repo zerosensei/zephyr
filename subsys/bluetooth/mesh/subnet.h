@@ -9,8 +9,8 @@
 
 #include <stdint.h>
 #include <sys/types.h>
-#include <net/buf.h>
-#include <zephyr.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/kernel.h>
 
 #define BT_MESH_NET_FLAG_KR       BIT(0)
 #define BT_MESH_NET_FLAG_IVU      BIT(1)
@@ -73,8 +73,7 @@ struct bt_mesh_subnet_cb {
 			    enum bt_mesh_key_evt evt);
 };
 
-/** @def BT_MESH_SUBNET_CB
- *
+/**
  *  @brief Register a subnet event callback.
  *
  *  @param _name Handler name.

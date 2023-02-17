@@ -12,8 +12,7 @@ to accelerate software development and debug of ARC EM processors and subsystems
 a wide range of ultra-low power embedded applications such as IoT, sensor fusion,
 and voice applications.
 
-.. image:: ./emsdp.jpg
-   :width: 442px
+.. image:: emsdp.jpg
    :align: center
    :alt: DesignWare(R) ARC(R) EM Software Development Platform (synopsys.com)
 
@@ -46,7 +45,7 @@ The following table shows the hardware features supported for different core con
 +-----------+-----+-----+------+------+----------+------+-------+
 
 For hardware feature details, refer to : `ARC EM Software Development Platform
-<https://embarc.org/embarc_osp/doc/build/html/board/emsdp.html>`__
+<https://embarc.org/project/arc-em-software-development-platform-sdp/>`__
 
 
 Programming and Debugging
@@ -63,7 +62,7 @@ a few additional pieces of hardware are required.
 * A universal switching power adaptor (110-240V AC to 12 DC),
   provided in the package, which used to power the board.
 
-* :ref:`The Zephyr SDK <zephyr_sdk>`
+* :ref:`The Zephyr SDK <toolchain_zephyr_sdk>`
 
 * Terminal emulator software for use with the USB-UART. Suggestion:
   `Putty Website`_.

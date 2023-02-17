@@ -5,10 +5,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <drivers/entropy.h>
-#include <sys/atomic.h>
+#include <zephyr/drivers/entropy.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/atomic.h>
 #include <soc.h>
 #include <hal/nrf_rng.h>
+#include <zephyr/irq.h>
 
 #define DT_DRV_COMPAT	nordic_nrf_rng
 

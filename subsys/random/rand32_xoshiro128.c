@@ -26,13 +26,14 @@
  * The state must be seeded so that it is not everywhere zero.
  */
 
-#include <init.h>
-#include <device.h>
-#include <drivers/entropy.h>
-#include <kernel.h>
+#include <zephyr/init.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/entropy.h>
+#include <zephyr/kernel.h>
 #include <string.h>
 
-static const struct device *entropy_driver;
+static const struct device *const entropy_driver =
+	DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
 static uint32_t state[4];
 static bool initialized;
 
@@ -43,7 +44,6 @@ static inline uint32_t rotl(const uint32_t x, int k)
 
 static int xoshiro128_initialize(const struct device *dev)
 {
-	entropy_driver = DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
 	if (!device_is_ready(entropy_driver)) {
 		return -ENODEV;
 	}

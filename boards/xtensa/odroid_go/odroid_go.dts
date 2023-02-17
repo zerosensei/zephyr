@@ -6,6 +6,7 @@
 /dts-v1/;
 
 #include "espressif/esp32.dtsi"
+#include "odroid_go-pinctrl.dtsi"
 
 / {
 	model = "ODROID-GO Game Kit";
@@ -56,8 +57,7 @@
 	};
 
 	lcd_backlight_en {
-		compatible = "regulator-fixed-sync", "regulator-fixed";
-		label = "lcd_backlight_enable";
+		compatible = "regulator-fixed";
 		regulator-name = "lcd_backlight_enable";
 		enable-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
 		regulator-boot-on;
@@ -67,6 +67,7 @@
 		uart-0 = &uart0;
 		led0 = &blue_led;
 		sw0 = &menu_button;
+		watchdog0 = &wdt0;
 	};
 };
 
@@ -81,8 +82,8 @@
 &uart0 {
 	status = "okay";
 	current-speed = <115200>;
-	tx-pin = <1>;
-	rx-pin = <3>;
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-names = "default";
 };
 
 &gpio0 {
@@ -96,22 +97,21 @@
 &i2c0 {
 	status = "okay";
 	clock-frequency = <I2C_BITRATE_FAST>;
-	sda-pin = <4>;
-	scl-pin = <15>;
+	sda-gpios = <&gpio0 4 GPIO_OPEN_DRAIN>;
+	scl-gpios = <&gpio0 15 GPIO_OPEN_DRAIN>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
 };
 
 &spi3 {
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
-	miso-pin = <19>;
-	mosi-pin = <23>;
-	sclk-pin = <18>;
-	csel-pin = <5>;
+	pinctrl-0 = <&spim3_default>;
+	pinctrl-names = "default";
 
 	ili9341: ili9341@0 {
 		compatible = "ilitek,ili9341";
-		label = "DISPLAY";
 		spi-max-frequency = <25000000>;
 		reg = <0>;
 		cmd-data-gpios = <&gpio0 21 GPIO_ACTIVE_LOW>;
@@ -119,6 +119,17 @@
 		rotation = <270>;
 		width = <320>;
 		height = <240>;
+	};
+
+	sdhc0: sdhc@1 {
+		compatible = "zephyr,sdhc-spi-slot";
+		reg = <1>;
+		status = "okay";
+		mmc {
+			compatible = "zephyr,sdmmc-disk";
+			status = "okay";
+		};
+		spi-max-frequency = <20000000>;
 	};
 };
 

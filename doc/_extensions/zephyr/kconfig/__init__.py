@@ -71,9 +71,7 @@ import kconfiglib
 def kconfig_load(app: Sphinx) -> Tuple[kconfiglib.Kconfig, Dict[str, str]]:
     """Load Kconfig"""
     with TemporaryDirectory() as td:
-        projects = zephyr_module.west_projects()
-        projects = [p.posixpath for p in projects["projects"]] if projects else None
-        modules = zephyr_module.parse_modules(ZEPHYR_BASE, projects)
+        modules = zephyr_module.parse_modules(ZEPHYR_BASE)
 
         # generate Kconfig.modules file
         kconfig = ""
@@ -81,6 +79,12 @@ def kconfig_load(app: Sphinx) -> Tuple[kconfiglib.Kconfig, Dict[str, str]]:
             kconfig += zephyr_module.process_kconfig(module.project, module.meta)
 
         with open(Path(td) / "Kconfig.modules", "w") as f:
+            f.write(kconfig)
+
+        # generate dummy Kconfig.dts file
+        kconfig = ""
+
+        with open(Path(td) / "Kconfig.dts", "w") as f:
             f.write(kconfig)
 
         # base environment
@@ -247,7 +251,10 @@ def kconfig_build_resources(app: Sphinx) -> None:
         kconfig, module_paths = kconfig_load(app)
         db = list()
 
-        for sc in chain(kconfig.unique_defined_syms, kconfig.unique_choices):
+        for sc in sorted(
+            chain(kconfig.unique_defined_syms, kconfig.unique_choices),
+            key=lambda sc: sc.name if sc.name else "",
+        ):
             # skip nameless symbols
             if not sc.name:
                 continue
@@ -263,6 +270,23 @@ def kconfig_build_resources(app: Sphinx) -> None:
                     if cond is not sc.kconfig.y:
                         fmt += f" if {kconfiglib.expr_str(cond, sc_fmt)}"
                     alt_defaults.append([fmt, node.filename])
+
+            # build list of symbols that select/imply the current one
+            # note: all reverse dependencies are ORed together, and conditionals
+            # (e.g. select/imply A if B) turns into A && B. So we first split
+            # by OR to include all entries, and we split each one by AND to just
+            # take the first entry.
+            selected_by = list()
+            if isinstance(sc, kconfiglib.Symbol) and sc.rev_dep != sc.kconfig.n:
+                for select in kconfiglib.split_expr(sc.rev_dep, kconfiglib.OR):
+                    sym = kconfiglib.split_expr(select, kconfiglib.AND)[0]
+                    selected_by.append(f"CONFIG_{sym.name}")
+
+            implied_by = list()
+            if isinstance(sc, kconfiglib.Symbol) and sc.weak_rev_dep != sc.kconfig.n:
+                for select in kconfiglib.split_expr(sc.weak_rev_dep, kconfiglib.OR):
+                    sym = kconfiglib.split_expr(select, kconfiglib.AND)[0]
+                    implied_by.append(f"CONFIG_{sym.name}")
 
             # only process nodes with prompt or help
             nodes = [node for node in sc.nodes if node.prompt or node.help]
@@ -316,10 +340,23 @@ def kconfig_build_resources(app: Sphinx) -> None:
                     for sym in sc.syms:
                         choices.append(kconfiglib.expr_str(sym, sc_fmt))
 
+                menupath = ""
+                iternode = node
+                while iternode.parent is not iternode.kconfig.top_node:
+                    iternode = iternode.parent
+                    if iternode.prompt:
+                        title = iternode.prompt[0]
+                    else:
+                        title = kconfiglib.standard_sc_expr_str(iternode.item)
+                    menupath = f" > {title}" + menupath
+
+                menupath = "(Top)" + menupath
+
                 filename = node.filename
                 for name, path in module_paths.items():
+                    path += "/"
                     if node.filename.startswith(path):
-                        filename = node.filename.replace(path, f"<module:{name}>")
+                        filename = node.filename.replace(path, f"<module:{name}>/")
                         break
 
                 db.append(
@@ -332,11 +369,14 @@ def kconfig_build_resources(app: Sphinx) -> None:
                         "defaults": defaults,
                         "alt_defaults": alt_defaults,
                         "selects": selects,
+                        "selected_by": selected_by,
                         "implies": implies,
+                        "implied_by": implied_by,
                         "ranges": ranges,
                         "choices": choices,
                         "filename": filename,
                         "linenr": node.linenr,
+                        "menupath": menupath,
                     }
                 )
 

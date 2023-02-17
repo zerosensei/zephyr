@@ -8,13 +8,13 @@
  * http://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BMI160-DS000-07.pdf
  */
 
-#include <init.h>
-#include <drivers/i2c.h>
-#include <drivers/sensor.h>
-#include <sys/byteorder.h>
-#include <kernel.h>
-#include <sys/__assert.h>
-#include <logging/log.h>
+#include <zephyr/init.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/logging/log.h>
 
 #include "bmi160.h"
 
@@ -60,7 +60,7 @@ bool bmi160_bus_ready_spi(const struct device *dev)
 {
 	const struct bmi160_cfg *cfg = dev->config;
 
-	return spi_is_ready(&cfg->bus.spi);
+	return spi_is_ready_dt(&cfg->bus.spi);
 }
 
 int bmi160_read_spi(const struct device *dev,
@@ -898,7 +898,7 @@ int bmi160_init(const struct device *dev)
 		return -EIO;
 	}
 
-	k_busy_wait(100);
+	k_busy_wait(150);
 
 	if (bmi160_byte_read(dev, BMI160_REG_CHIPID, &val) < 0) {
 		LOG_DBG("Failed to read chip id.");
@@ -983,7 +983,7 @@ int bmi160_init(const struct device *dev)
 #endif
 
 #define BMI160_DEVICE_INIT(inst)					\
-	DEVICE_DT_INST_DEFINE(inst, bmi160_init, NULL,			\
+	SENSOR_DEVICE_DT_INST_DEFINE(inst, bmi160_init, NULL,		\
 			      &bmi160_data_##inst, &bmi160_cfg_##inst,	\
 			      POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,	\
 			      &bmi160_api);

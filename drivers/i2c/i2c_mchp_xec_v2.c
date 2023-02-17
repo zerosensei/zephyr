@@ -7,18 +7,21 @@
 
 #define DT_DRV_COMPAT microchip_xec_i2c_v2
 
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <soc.h>
 #include <errno.h>
-#include <drivers/clock_control.h>
-#include <drivers/gpio.h>
-#include <drivers/i2c.h>
-#include <drivers/interrupt_controller/intc_mchp_xec_ecia.h>
-#include <drivers/pinctrl.h>
-#include <sys/printk.h>
-#include <sys/sys_io.h>
-#include <logging/log.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/interrupt_controller/intc_mchp_xec_ecia.h>
+#include <zephyr/drivers/pinctrl.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/sys_io.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(i2c_mchp, CONFIG_I2C_LOG_LEVEL);
+
+#include "i2c-priv.h"
 
 #define SPEED_100KHZ_BUS	0
 #define SPEED_400KHZ_BUS	1
@@ -75,13 +78,14 @@ struct xec_speed_cfg {
 	uint32_t bus_clk;
 	uint32_t data_timing;
 	uint32_t start_hold_time;
-	uint32_t config;
+	uint32_t idle_scale;
 	uint32_t timeout_scale;
 };
 
 struct i2c_xec_config {
 	uint32_t port_sel;
 	uint32_t base_addr;
+	uint32_t clock_freq;
 	uint8_t girq;
 	uint8_t girq_pos;
 	uint8_t pcr_idx;
@@ -94,7 +98,7 @@ struct i2c_xec_data {
 	uint8_t state;
 	uint8_t read_discard;
 	uint8_t speed_id;
-	struct i2c_slave_config *target_cfg;
+	struct i2c_target_config *target_cfg;
 	bool target_attached;
 	bool target_read;
 	uint32_t i2c_compl;
@@ -114,21 +118,21 @@ static const struct xec_speed_cfg xec_cfg_params[] = {
 		.bus_clk            = 0x00004F4F,
 		.data_timing        = 0x0C4D5006,
 		.start_hold_time    = 0x0000004D,
-		.config             = 0x01FC01ED,
+		.idle_scale         = 0x01FC01ED,
 		.timeout_scale      = 0x4B9CC2C7,
 	},
 	[SPEED_400KHZ_BUS] = {
 		.bus_clk            = 0x00000F17,
 		.data_timing        = 0x040A0A06,
 		.start_hold_time    = 0x0000000A,
-		.config             = 0x01000050,
+		.idle_scale         = 0x01000050,
 		.timeout_scale      = 0x159CC2C7,
 	},
 	[SPEED_1MHZ_BUS] = {
 		.bus_clk            = 0x00000509,
 		.data_timing        = 0x04060601,
 		.start_hold_time    = 0x00000006,
-		.config             = 0x10000050,
+		.idle_scale         = 0x10000050,
 		.timeout_scale      = 0x089CC2C7,
 	},
 };
@@ -244,7 +248,7 @@ static int i2c_xec_reset_config(const struct device *dev)
 	 * enable in the configuration register.
 	 */
 	regs->OWN_ADDR = EC_OWN_I2C_ADDR | (EC_OWN_I2C_ADDR << 8);
-#ifdef CONFIG_I2C_SLAVE
+#ifdef CONFIG_I2C_TARGET
 	if (data->target_cfg) {
 		regs->OWN_ADDR = data->target_cfg->address;
 	}
@@ -263,6 +267,7 @@ static int i2c_xec_reset_config(const struct device *dev)
 	regs->RSHTM = xec_cfg_params[data->speed_id].start_hold_time;
 	regs->DATATM = xec_cfg_params[data->speed_id].data_timing;
 	regs->TMOUTSC = xec_cfg_params[data->speed_id].timeout_scale;
+	regs->IDLSC = xec_cfg_params[data->speed_id].idle_scale;
 
 	/*
 	 * PIN=1 clears all status except NBB
@@ -398,7 +403,7 @@ recov_exit:
 	return ret;
 }
 
-#ifdef CONFIG_I2C_SLAVE
+#ifdef CONFIG_I2C_TARGET
 /*
  * Restart I2C controller as target for ACK of address match.
  * Setting PIN clears all status in I2C.Status register except NBB.
@@ -567,7 +572,7 @@ static int i2c_xec_configure(const struct device *dev,
 	struct i2c_xec_data *data =
 		(struct i2c_xec_data *const) (dev->data);
 
-	if (!(dev_config_raw & I2C_MODE_MASTER)) {
+	if (!(dev_config_raw & I2C_MODE_CONTROLLER)) {
 		return -ENOTSUP;
 	}
 
@@ -772,7 +777,7 @@ static int i2c_xec_transfer(const struct device *dev, struct i2c_msg *msgs,
 	struct i2c_xec_data *data = dev->data;
 	int ret = 0;
 
-#ifdef CONFIG_I2C_SLAVE
+#ifdef CONFIG_I2C_TARGET
 	if (data->target_attached) {
 		LOG_ERR("Device is registered as target");
 		return -EBUSY;
@@ -800,11 +805,11 @@ static int i2c_xec_transfer(const struct device *dev, struct i2c_msg *msgs,
 
 static void i2c_xec_bus_isr(const struct device *dev)
 {
-#ifdef CONFIG_I2C_SLAVE
+#ifdef CONFIG_I2C_TARGET
 	const struct i2c_xec_config *cfg =
 		(const struct i2c_xec_config *const) (dev->config);
 	struct i2c_xec_data *data = dev->data;
-	const struct i2c_slave_callbacks *target_cb =
+	const struct i2c_target_callbacks *target_cb =
 		data->target_cfg->callbacks;
 	struct i2c_smb_regs *regs = (struct i2c_smb_regs *)cfg->base_addr;
 	int ret;
@@ -968,9 +973,9 @@ clear_iag:
 #endif
 }
 
-#ifdef CONFIG_I2C_SLAVE
+#ifdef CONFIG_I2C_TARGET
 static int i2c_xec_target_register(const struct device *dev,
-				   struct i2c_slave_config *config)
+				   struct i2c_target_config *config)
 {
 	const struct i2c_xec_config *cfg = dev->config;
 	struct i2c_xec_data *data = dev->data;
@@ -1011,7 +1016,7 @@ static int i2c_xec_target_register(const struct device *dev,
 }
 
 static int i2c_xec_target_unregister(const struct device *dev,
-				     struct i2c_slave_config *config)
+				     struct i2c_target_config *config)
 {
 	const struct i2c_xec_config *cfg = dev->config;
 	struct i2c_xec_data *data = dev->data;
@@ -1032,9 +1037,9 @@ static int i2c_xec_target_unregister(const struct device *dev,
 static const struct i2c_driver_api i2c_xec_driver_api = {
 	.configure = i2c_xec_configure,
 	.transfer = i2c_xec_transfer,
-#ifdef CONFIG_I2C_SLAVE
-	.slave_register = i2c_xec_target_register,
-	.slave_unregister = i2c_xec_target_unregister,
+#ifdef CONFIG_I2C_TARGET
+	.target_register = i2c_xec_target_register,
+	.target_unregister = i2c_xec_target_unregister,
 #endif
 };
 
@@ -1044,6 +1049,7 @@ static int i2c_xec_init(const struct device *dev)
 	struct i2c_xec_data *data =
 		(struct i2c_xec_data *const) (dev->data);
 	int ret;
+	uint32_t bitrate_cfg;
 
 	data->state = I2C_XEC_STATE_STOPPED;
 	data->target_cfg = NULL;
@@ -1055,15 +1061,18 @@ static int i2c_xec_init(const struct device *dev)
 		return ret;
 	}
 
+	bitrate_cfg = i2c_map_dt_bitrate(cfg->clock_freq);
+	if (!bitrate_cfg) {
+		return -EINVAL;
+	}
+
 	/* Default configuration */
-	ret = i2c_xec_configure(dev,
-				I2C_MODE_MASTER |
-				I2C_SPEED_SET(I2C_SPEED_STANDARD));
+	ret = i2c_xec_configure(dev, I2C_MODE_CONTROLLER | bitrate_cfg);
 	if (ret) {
 		return ret;
 	}
 
-#ifdef CONFIG_I2C_SLAVE
+#ifdef CONFIG_I2C_TARGET
 	const struct i2c_xec_config *config =
 	(const struct i2c_xec_config *const) (dev->config);
 
@@ -1083,6 +1092,7 @@ static int i2c_xec_init(const struct device *dev)
 		.base_addr =						\
 			DT_INST_REG_ADDR(n),				\
 		.port_sel = DT_INST_PROP(n, port_sel),			\
+		.clock_freq = DT_INST_PROP(n, clock_frequency),		\
 		.girq = DT_INST_PROP_BY_IDX(n, girqs, 0),		\
 		.girq_pos = DT_INST_PROP_BY_IDX(n, girqs, 1),		\
 		.pcr_idx = DT_INST_PROP_BY_IDX(n, pcrs, 0),		\

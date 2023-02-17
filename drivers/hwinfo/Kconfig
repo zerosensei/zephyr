@@ -31,7 +31,8 @@ config HWINFO_STM32
 config HWINFO_NRF
 	bool "NRF device ID"
 	default y
-	depends on SOC_FAMILY_NRF && !TRUSTED_EXECUTION_NONSECURE
+	depends on SOC_FAMILY_NRF
+	depends on NRF_SOC_SECURE_SUPPORTED
 	help
 	  Enable Nordic NRF hwinfo driver.
 
@@ -56,10 +57,17 @@ config HWINFO_MCUX_SRC
 	help
 	  Enable NXP i.MX mcux SRC hwinfo driver.
 
+config HWINFO_MCUX_SRC_V2
+	bool "NXP SRC reset cause (multicore devices)"
+	default y
+	depends on HAS_MCUX_SRC_V2
+	help
+	  Enable version 2 multicore NXP i.MX mcux SRC hwinfo driver.
+
 config HWINFO_MCUX_SYSCON
 	bool "NXP LPC device ID"
 	default y
-	depends on HAS_MCUX_SYSCON && !SOC_SERIES_LPC54XXX
+	depends on DT_HAS_NXP_LPC_UID_ENABLED
 	help
 	  Enable NXP LPC mcux hwinfo driver.
 
@@ -110,7 +118,7 @@ config HWINFO_SAM0
 config HWINFO_ESP32
 	bool "ESP32 device ID"
 	default y
-	depends on SOC_ESP32
+	depends on SOC_ESP32 || SOC_ESP32C3
 	help
 	  Enable ESP32 hwinfo driver.
 
@@ -131,9 +139,16 @@ config HWINFO_PSOC6
 config HWINFO_GECKO
 	bool "GECKO hwinfo"
 	default y
-	depends on SOC_FAMILY_EXX32 && !SOC_SERIES_EFR32MG21
+	depends on SOC_FAMILY_EXX32 && !SOC_SERIES_EFR32MG21  && !SOC_SERIES_EFR32BG22
 	select SOC_GECKO_RMU
 	help
 	  Enable Silabs GECKO hwinfo driver.
+
+config HWINFO_ANDES
+	bool "Andes system ID"
+	default y
+	depends on SOC_SERIES_RISCV_ANDES_V5
+	help
+	  Enable Andes hwinfo driver
 
 endif

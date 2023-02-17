@@ -8,9 +8,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <kernel.h>
-#include <device.h>
-#include <init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
 #include <fsl_common.h>
 #include <fsl_clock.h>
 
@@ -87,7 +87,7 @@ static ALWAYS_INLINE void clk_init(void)
 	CLOCK_SetLpuartClock(PERIPH_CLK_PLLFLLSEL);
 #endif
 
-#if CONFIG_USB_KINETIS
+#if CONFIG_USB_KINETIS || CONFIG_UDC_KINETIS
 	CLOCK_EnableUsbfs0Clock(kCLOCK_UsbSrcPll0, 120000000UL);
 #endif
 }

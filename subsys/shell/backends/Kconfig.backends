@@ -37,7 +37,8 @@ config SHELL_PROMPT_UART
 	string "Displayed prompt name"
 	default "uart:~$ "
 	help
-	  Displayed prompt name for UART backend.
+	  Displayed prompt name for UART backend. If prompt is set, the shell will
+	  send two newlines during initialization.
 
 # Internal config to enable UART interrupts if supported.
 config SHELL_BACKEND_SERIAL_INTERRUPT_DRIVEN
@@ -56,6 +57,7 @@ config SHELL_BACKEND_SERIAL_TX_RING_BUFFER_SIZE
 
 config SHELL_BACKEND_SERIAL_RX_RING_BUFFER_SIZE
 	int "Set RX ring buffer size"
+	default 256 if MCUMGR_TRANSPORT_SHELL
 	default 64
 	help
 	  RX ring buffer size impacts accepted latency of handling incoming
@@ -81,7 +83,7 @@ module = SHELL_BACKEND_SERIAL
 default-timeout = 100
 source "subsys/shell/Kconfig.template.shell_log_queue_timeout"
 
-default-size = 10
+default-size = 512
 source "subsys/shell/Kconfig.template.shell_log_queue_size"
 
 choice
@@ -133,7 +135,8 @@ config SHELL_PROMPT_RTT
 	string "Displayed prompt name"
 	default "rtt:~$ "
 	help
-	  Displayed prompt name for RTT backend.
+	  Displayed prompt name for RTT backend. If prompt is set, the shell will
+	  send two newlines during initialization.
 
 config SHELL_RTT_RX_POLL_PERIOD
 	int "RX polling period (in milliseconds)"
@@ -145,7 +148,7 @@ module = SHELL_BACKEND_RTT
 default-timeout = 100
 source "subsys/shell/Kconfig.template.shell_log_queue_timeout"
 
-default-size = 10
+default-size = 512
 source "subsys/shell/Kconfig.template.shell_log_queue_size"
 
 choice
@@ -241,7 +244,7 @@ module = SHELL_BACKEND_MQTT
 default-timeout = 100
 source "subsys/shell/Kconfig.template.shell_log_queue_timeout"
 
-default-size = 10
+default-size = 512
 source "subsys/shell/Kconfig.template.shell_log_queue_size"
 
 choice
@@ -296,7 +299,8 @@ config SHELL_PROMPT_TELNET
 	string "Displayed prompt name"
 	default "~$ "
 	help
-	  Displayed prompt name for TELNET backend.
+	  Displayed prompt name for TELNET backend. If prompt is set, the shell will
+	  send two newlines during initialization.
 
 config SHELL_TELNET_PORT
 	int "Telnet port number"
@@ -336,7 +340,7 @@ module = SHELL_TELNET
 default-timeout = 100
 source "subsys/shell/Kconfig.template.shell_log_queue_timeout"
 
-default-size = 10
+default-size = 512
 source "subsys/shell/Kconfig.template.shell_log_queue_size"
 
 choice
@@ -390,10 +394,12 @@ config SHELL_PROMPT_DUMMY
 	string "Displayed prompt name"
 	default "~$ "
 	help
-	  Displayed prompt name for DUMMY backend.
+	  Displayed prompt name for DUMMY backend. If prompt is set, the shell will
+	  send two newlines during initialization.
 
 config SHELL_BACKEND_DUMMY_BUF_SIZE
 	int "Size of dummy buffer size"
+	default 400 if LOG_PRINTK
 	default 300
 	help
 	  This is size of output buffer that will be used by dummy backend, this limits number of

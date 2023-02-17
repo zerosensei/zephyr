@@ -11,9 +11,9 @@
 
 #include <errno.h>
 
-#include "settings/settings.h"
+#include <zephyr/settings/settings.h>
 #include "settings/settings_file.h"
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 
 
 bool settings_subsys_initialized;
@@ -33,7 +33,7 @@ int settings_subsys_init(void)
 
 	settings_init();
 
-	err = settings_backend_init(); /* func rises kernel panic once error */
+	err = settings_backend_init();
 
 	if (!err) {
 		settings_subsys_initialized = true;

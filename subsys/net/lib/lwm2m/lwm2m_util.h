@@ -7,7 +7,7 @@
 #ifndef LWM2M_UTIL_H_
 #define LWM2M_UTIL_H_
 
-#include <net/lwm2m.h>
+#include <zephyr/net/lwm2m.h>
 
 /* convert float to binary format */
 int lwm2m_float_to_b32(double *in, uint8_t *b32, size_t len);
@@ -33,4 +33,5 @@ int lwm2m_path_to_string(char *buf, size_t buf_size, struct lwm2m_obj_path *inpu
 
 int lwm2m_string_to_path(const char *pathstr, struct lwm2m_obj_path *path, char delim);
 
+bool lwm2m_obj_path_equal(struct lwm2m_obj_path *a, struct lwm2m_obj_path *b);
 #endif /* LWM2M_UTIL_H_ */

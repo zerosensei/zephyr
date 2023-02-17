@@ -11,8 +11,7 @@ development kit for the SimpleLink |trade| multi-Standard CC1352R wireless MCU.
 
 See the `TI CC1352R LaunchPad Product Page`_ for details.
 
-.. figure:: img/cc1352r1_launchxl.png
-   :width: 400px
+.. figure:: img/cc1352r1_launchxl.jpg
    :align: center
    :alt: TI CC1352R LaunchPad
 
@@ -42,6 +41,8 @@ features:
 +===========+============+======================+
 | GPIO      | on-chip    | gpio                 |
 +-----------+------------+----------------------+
+| MPU       | on-chip    | arch/arm             |
++-----------+------------+----------------------+
 | NVIC      | on-chip    | arch/arm             |
 +-----------+------------+----------------------+
 | PINMUX    | on-chip    | pinmux               |
@@ -51,6 +52,10 @@ features:
 | I2C       | on-chip    | i2c                  |
 +-----------+------------+----------------------+
 | SPI       | on-chip    | spi                  |
++-----------+------------+----------------------+
+| WDT       | on-chip    | watchdog             |
++-----------+------------+----------------------+
+| AUX_ADC   | on-chip    | adc                  |
 +-----------+------------+----------------------+
 
 Other hardware features have not been enabled yet for this board.
@@ -144,7 +149,7 @@ Prerequisites:
 #. Install OpenOCD
 
    You can obtain OpenOCD by following these
-   :ref:`installing the latest Zephyr SDK instructions <zephyr_sdk>`.
+   :ref:`installing the latest Zephyr SDK instructions <toolchain_zephyr_sdk>`.
 
    After the installation, add the directory containing the OpenOCD executable
    to your environment's PATH variable. For example, use this command in Linux:
@@ -216,9 +221,9 @@ disable sleep state 2 while polling:
 
 .. code-block:: c
 
-    pm_policy_state_lock_get(PM_STATE_STANDBY);
+    pm_policy_state_lock_get(PM_STATE_STANDBY, PM_ALL_SUBSTATES);
     <code that calls uart_poll_in() and expects input at any point in time>
-    pm_policy_state_lock_put(PM_STATE_STANDBY);
+    pm_policy_state_lock_put(PM_STATE_STANDBY, PM_ALL_SUBSTATES);
 
 
 References

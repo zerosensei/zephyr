@@ -6,14 +6,14 @@
 
 #define DT_DRV_COMPAT maxim_max31875
 
-#include <device.h>
-#include <drivers/i2c.h>
-#include <sys/byteorder.h>
-#include <sys/util.h>
-#include <kernel.h>
-#include <drivers/sensor.h>
-#include <sys/__assert.h>
-#include <logging/log.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(MAX31875, CONFIG_SENSOR_LOG_LEVEL);
 
@@ -268,7 +268,7 @@ static int max31875_init(const struct device *dev)
 		.resolution = DT_INST_ENUM_IDX(inst, resolution),			  \
 		.data_format = DT_INST_PROP(inst, extended_mode),			  \
 	};										  \
-	DEVICE_DT_INST_DEFINE(inst, max31875_init, NULL, &max31875_data_##inst,		  \
+	SENSOR_DEVICE_DT_INST_DEFINE(inst, max31875_init, NULL, &max31875_data_##inst,	  \
 			      &max31875_config_##inst, POST_KERNEL,			  \
 			      CONFIG_SENSOR_INIT_PRIORITY, &max31875_driver_api);
 

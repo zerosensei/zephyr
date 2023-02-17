@@ -11,15 +11,15 @@
  */
 
 #include <errno.h>
-#include <sys/__assert.h>
-#include <sys/util.h>
-#include <device.h>
-#include <init.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
 #include <soc.h>
-#include <drivers/sensor.h>
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/pinctrl.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(qdec_sam, CONFIG_SENSOR_LOG_LEVEL);
 
 /* Device constant configuration parameters */
@@ -130,7 +130,7 @@ static const struct sensor_driver_api qdec_sam_driver_api = {
 									\
 	static struct qdec_sam_dev_data qdec##n##_sam_data;		\
 									\
-	DEVICE_DT_INST_DEFINE(n, qdec_sam_initialize, NULL,		\
+	SENSOR_DEVICE_DT_INST_DEFINE(n, qdec_sam_initialize, NULL,	\
 			    &qdec##n##_sam_data, &qdec##n##_sam_config, \
 			    POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,	\
 			    &qdec_sam_driver_api);

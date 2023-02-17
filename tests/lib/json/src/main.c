@@ -6,8 +6,8 @@
 #include <string.h>
 #include <zephyr/types.h>
 #include <stdbool.h>
-#include <ztest.h>
-#include <data/json.h>
+#include <zephyr/ztest.h>
+#include <zephyr/data/json.h>
 
 struct test_nested {
 	int nested_int;
@@ -106,7 +106,7 @@ static const struct json_obj_descr array_array_descr[] = {
 				   ARRAY_SIZE(array_descr)),
 };
 
-static void test_json_encoding(void)
+ZTEST(lib_json_test, test_json_encoding)
 {
 	struct test_struct ts = {
 		.some_string = "zephyr 123\uABCD",
@@ -164,7 +164,7 @@ static void test_json_encoding(void)
 	zassert_equal(ret, 0, "Encoded contents not consistent");
 }
 
-static void test_json_decoding(void)
+ZTEST(lib_json_test, test_json_decoding)
 {
 	struct test_struct ts;
 	char encoded[] = "{\"some_string\":\"zephyr 123\\uABCD456\","
@@ -228,7 +228,7 @@ static void test_json_decoding(void)
 		     "Named nested string not decoded correctly");
 }
 
-static void test_json_limits(void)
+ZTEST(lib_json_test, test_json_limits)
 {
 	int ret = 0;
 	char encoded[] = "{\"int_max\":2147483647,"
@@ -255,7 +255,7 @@ static void test_json_limits(void)
 		     "Integer limits not decoded correctly");
 }
 
-static void test_json_decoding_array_array(void)
+ZTEST(lib_json_test, test_json_decoding_array_array)
 {
 	int ret;
 	struct obj_array_array obj_array_array_ts;
@@ -290,7 +290,7 @@ static void test_json_decoding_array_array(void)
 		      "Usain Bolt height not decoded correctly");
 }
 
-static void test_json_obj_arr_encoding(void)
+ZTEST(lib_json_test, test_json_obj_arr_encoding)
 {
 	struct obj_array oa = {
 		.elements = {
@@ -329,7 +329,7 @@ static void test_json_obj_arr_encoding(void)
 		     "Encoded array of objects is not consistent");
 }
 
-static void test_json_arr_obj_decoding(void)
+ZTEST(lib_json_test, test_json_arr_obj_decoding)
 {
 	int ret;
 	struct obj_array obj_array_array_ts;
@@ -362,7 +362,7 @@ static void test_json_arr_obj_decoding(void)
 		      "Usain Bolt height not decoded correctly");
 }
 
-static void test_json_arr_obj_encoding(void)
+ZTEST(lib_json_test, test_json_arr_obj_encoding)
 {
 	struct obj_array oa = {
 		.elements = {
@@ -400,7 +400,7 @@ static void test_json_arr_obj_encoding(void)
 		     "Encoded array of objects is not consistent");
 }
 
-static void test_json_obj_arr_decoding(void)
+ZTEST(lib_json_test, test_json_obj_arr_decoding)
 {
 	struct obj_array oa;
 	char encoded[] = "{\"elements\":["
@@ -469,7 +469,7 @@ static void parse_harness(struct encoding_test encoded[], size_t size)
 	}
 }
 
-static void test_json_invalid_string(void)
+ZTEST(lib_json_test, test_json_invalid_string)
 {
 	struct encoding_test encoded[] = {
 		{ "{\"some_string\":\"\\u@@@@\"}", -EINVAL },
@@ -482,7 +482,7 @@ static void test_json_invalid_string(void)
 	parse_harness(encoded, ARRAY_SIZE(encoded));
 }
 
-static void test_json_invalid_bool(void)
+ZTEST(lib_json_test, test_json_invalid_bool)
 {
 	struct encoding_test encoded[] = {
 		{ "{\"some_bool\":truffle }", -EINVAL},
@@ -492,7 +492,7 @@ static void test_json_invalid_bool(void)
 	parse_harness(encoded, ARRAY_SIZE(encoded));
 }
 
-static void test_json_invalid_null(void)
+ZTEST(lib_json_test, test_json_invalid_null)
 {
 	struct encoding_test encoded[] = {
 		/* Parser will recognize 'null', but refuse to decode it */
@@ -504,7 +504,7 @@ static void test_json_invalid_null(void)
 	parse_harness(encoded, ARRAY_SIZE(encoded));
 }
 
-static void test_json_invalid_number(void)
+ZTEST(lib_json_test, test_json_invalid_number)
 {
 	struct encoding_test encoded[] = {
 		{ "{\"some_int\":xxx }", -EINVAL},
@@ -513,7 +513,7 @@ static void test_json_invalid_number(void)
 	parse_harness(encoded, ARRAY_SIZE(encoded));
 }
 
-static void test_json_missing_quote(void)
+ZTEST(lib_json_test, test_json_missing_quote)
 {
 	struct test_struct ts;
 	char encoded[] = "{\"some_string";
@@ -524,7 +524,7 @@ static void test_json_missing_quote(void)
 	zassert_equal(ret, -EINVAL, "Decoding has to fail");
 }
 
-static void test_json_wrong_token(void)
+ZTEST(lib_json_test, test_json_wrong_token)
 {
 	struct test_struct ts;
 	char encoded[] = "{\"some_string\",}";
@@ -535,7 +535,7 @@ static void test_json_wrong_token(void)
 	zassert_equal(ret, -EINVAL, "Decoding has to fail");
 }
 
-static void test_json_item_wrong_type(void)
+ZTEST(lib_json_test, test_json_item_wrong_type)
 {
 	struct test_struct ts;
 	char encoded[] = "{\"some_string\":false}";
@@ -546,7 +546,7 @@ static void test_json_item_wrong_type(void)
 	zassert_equal(ret, -EINVAL, "Decoding has to fail");
 }
 
-static void test_json_key_not_in_descr(void)
+ZTEST(lib_json_test, test_json_key_not_in_descr)
 {
 	struct test_struct ts;
 	char encoded[] = "{\"key_not_in_descr\":123456}";
@@ -557,7 +557,7 @@ static void test_json_key_not_in_descr(void)
 	zassert_equal(ret, 0, "No items should be decoded");
 }
 
-static void test_json_escape(void)
+ZTEST(lib_json_test, test_json_escape)
 {
 	char buf[42];
 	char string[] = "\"abc"
@@ -589,7 +589,7 @@ static void test_json_escape(void)
 }
 
 /* Edge case: only one character, which must be escaped. */
-static void test_json_escape_one(void)
+ZTEST(lib_json_test, test_json_escape_one)
 {
 	char buf[3] = {'\t', '\0', '\0'};
 	const char *expected = "\\t";
@@ -605,7 +605,7 @@ static void test_json_escape_one(void)
 		     "Escaped value is not correct");
 }
 
-static void test_json_escape_empty(void)
+ZTEST(lib_json_test, test_json_escape_empty)
 {
 	char empty[] = "";
 	size_t len = sizeof(empty) - 1;
@@ -617,7 +617,7 @@ static void test_json_escape_empty(void)
 	zassert_equal(empty[0], '\0', "Empty string does not remain empty");
 }
 
-static void test_json_escape_no_op(void)
+ZTEST(lib_json_test, test_json_escape_no_op)
 {
 	char nothing_to_escape[] = "hello,world:!";
 	const char *expected = "hello,world:!";
@@ -632,7 +632,7 @@ static void test_json_escape_no_op(void)
 		     "Altered string with nothing to escape");
 }
 
-static void test_json_escape_bounds_check(void)
+ZTEST(lib_json_test, test_json_escape_bounds_check)
 {
 	char not_enough_memory[] = "\tfoo";
 	size_t len = sizeof(not_enough_memory) - 1;
@@ -642,7 +642,7 @@ static void test_json_escape_bounds_check(void)
 	zassert_equal(ret, -ENOMEM, "Bounds check failed");
 }
 
-static void test_json_encode_bounds_check(void)
+ZTEST(lib_json_test, test_json_encode_bounds_check)
 {
 	struct number {
 		uint32_t val;
@@ -662,32 +662,112 @@ static void test_json_encode_bounds_check(void)
 	zassert_equal(ret, -ENOMEM, "Bounds check failed");
 }
 
-void test_main(void)
+ZTEST(lib_json_test, test_large_descriptor)
 {
-	ztest_test_suite(lib_json_test,
-			 ztest_unit_test(test_json_encoding),
-			 ztest_unit_test(test_json_decoding),
-			 ztest_unit_test(test_json_decoding_array_array),
-			 ztest_unit_test(test_json_obj_arr_encoding),
-			 ztest_unit_test(test_json_obj_arr_decoding),
-			 ztest_unit_test(test_json_invalid_string),
-			 ztest_unit_test(test_json_invalid_bool),
-			 ztest_unit_test(test_json_invalid_null),
-			 ztest_unit_test(test_json_invalid_number),
-			 ztest_unit_test(test_json_missing_quote),
-			 ztest_unit_test(test_json_wrong_token),
-			 ztest_unit_test(test_json_item_wrong_type),
-			 ztest_unit_test(test_json_key_not_in_descr),
-			 ztest_unit_test(test_json_escape),
-			 ztest_unit_test(test_json_escape_one),
-			 ztest_unit_test(test_json_escape_empty),
-			 ztest_unit_test(test_json_escape_no_op),
-			 ztest_unit_test(test_json_escape_bounds_check),
-			 ztest_unit_test(test_json_encode_bounds_check),
-			 ztest_unit_test(test_json_limits),
-			 ztest_unit_test(test_json_arr_obj_encoding),
-			 ztest_unit_test(test_json_arr_obj_decoding)
-			 );
+	struct large_struct {
+		int int0;
+		int int1;
+		int int2;
+		int int3;
+		int int4;
+		int int5;
+		int int6;
+		int int7;
+		int int8;
+		int int9;
+		int int10;
+		int int11;
+		int int12;
+		int int13;
+		int int14;
+		int int15;
+		int int16;
+		int int17;
+		int int18;
+		int int19;
+		int int20;
+		int int21;
+		int int22;
+		int int23;
+		int int24;
+		int int25;
+		int int26;
+		int int27;
+		int int28;
+		int int29;
+		int int30;
+		int int31;
+		int int32;
+		int int33;
+		int int34;
+		int int35;
+		int int36;
+		int int37;
+		int int38;
+		int int39;
+	};
 
-	ztest_run_test_suite(lib_json_test);
+	static const struct json_obj_descr large_descr[] = {
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int0, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int1, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int2, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int3, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int4, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int5, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int6, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int7, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int8, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int9, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int10, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int11, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int12, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int13, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int14, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int15, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int16, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int17, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int18, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int19, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int20, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int21, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int22, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int23, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int24, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int25, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int26, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int27, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int28, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int29, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int30, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int31, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int32, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int33, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int34, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int35, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int36, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int37, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int38, JSON_TOK_NUMBER),
+		JSON_OBJ_DESCR_PRIM(struct large_struct, int39, JSON_TOK_NUMBER),
+	};
+	char encoded[] = "{"
+		"\"int1\": 1,"
+		"\"int21\": 21,"
+		"\"int31\": 31,"
+		"\"int39\": 39"
+		"}";
+
+	struct large_struct ls;
+
+	int64_t ret = json_obj_parse(encoded, sizeof(encoded) - 1, large_descr,
+				     ARRAY_SIZE(large_descr), &ls);
+
+	zassert_false(ret < 0, "json_obj_parse returned error %d", ret);
+	zassert_false(ret & ((int64_t)1 << 2), "Field int2 erroneously decoded");
+	zassert_false(ret & ((int64_t)1 << 35), "Field int35 erroneously decoded");
+	zassert_true(ret & ((int64_t)1 << 1), "Field int1 not decoded");
+	zassert_true(ret & ((int64_t)1 << 21), "Field int21 not decoded");
+	zassert_true(ret & ((int64_t)1 << 31), "Field int31 not decoded");
+	zassert_true(ret & ((int64_t)1 << 39), "Field int39 not decoded");
 }
+
+ZTEST_SUITE(lib_json_test, NULL, NULL, NULL, NULL, NULL);

@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
 
-#include <sys/printk.h>
+#include <zephyr/sys/printk.h>
 
-#include <device.h>
-#include <drivers/i2c.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
 
-#include <drivers/misc/grove_lcd/grove_lcd.h>
+#include <zephyr/drivers/misc/grove_lcd/grove_lcd.h>
 
 /**
  * @file Display a counter through I2C and Grove LCD.
@@ -33,7 +33,7 @@ uint8_t clamp_rgb(int val)
 
 void main(void)
 {
-	const struct device *glcd = DEVICE_DT_GET(DT_NODELABEL(glcd));
+	const struct device *const glcd = DEVICE_DT_GET(DT_NODELABEL(glcd));
 	char str[20];
 	int rgb[] = { 0x0, 0x0, 0x0 };
 	uint8_t rgb_chg[3];

@@ -59,7 +59,12 @@
 		led1 = &blue_led;
 		led2 = &red_led;
 		sw0 = &user_button;
+		watchdog0 = &iwdg;
 	};
+};
+
+&clk_lsi {
+	status = "okay";
 };
 
 &clk_hse {
@@ -70,19 +75,19 @@
 
 &pll {
 	div-m = <4>;
-	mul-n = <72>;
+	mul-n = <216>;
 	div-p = <2>;
-	div-q = <3>;
+	div-q = <9>;
 	clocks = <&clk_hse>;
 	status = "okay";
 };
 
 &rcc {
 	clocks = <&pll>;
-	clock-frequency = <DT_FREQ_M(72)>;
+	clock-frequency = <DT_FREQ_M(216)>;
 	ahb-prescaler = <1>;
-	apb1-prescaler = <2>;
-	apb2-prescaler = <1>;
+	apb1-prescaler = <4>;
+	apb2-prescaler = <2>;
 };
 
 &usart2 {
@@ -148,6 +153,8 @@ zephyr_udc0: &usbotg_fs {
 };
 
 &rtc {
+	clocks = <&rcc STM32_CLOCK_BUS_APB1 0x10000000>,
+		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
 	status = "okay";
 };
 
@@ -200,7 +207,7 @@ zephyr_udc0: &usbotg_fs {
 		 */
 		boot_partition: partition@0 {
 			label = "mcuboot";
-			reg = <0x0 0x00010000>;
+			reg = <0x0 DT_SIZE_K(64)>;
 			read-only;
 		};
 
@@ -211,7 +218,7 @@ zephyr_udc0: &usbotg_fs {
 		 */
 		storage_partition: partition@10000 {
 			label = "storage";
-			reg = <0x00010000 0x00010000>;
+			reg = <0x00010000 DT_SIZE_K(64)>;
 		};
 
 		/*
@@ -223,7 +230,7 @@ zephyr_udc0: &usbotg_fs {
 		 */
 		slot0_partition: partition@40000 {
 			label = "image-0";
-			reg = <0x00040000 0x000C0000>;
+			reg = <0x00040000 DT_SIZE_K(768)>;
 		};
 
 		/*
@@ -231,7 +238,7 @@ zephyr_udc0: &usbotg_fs {
 		 */
 		slot1_partition: partition@100000 {
 			label = "image-1";
-			reg = <0x00100000 0x000C0000>;
+			reg = <0x00100000 DT_SIZE_K(768)>;
 		};
 
 		/*
@@ -239,7 +246,7 @@ zephyr_udc0: &usbotg_fs {
 		 */
 		scratch_partition: partition@1C0000 {
 			label = "image-scratch";
-			reg = <0x001C0000 0x00040000>;
+			reg = <0x001C0000 DT_SIZE_K(256)>;
 		};
 	};
 };

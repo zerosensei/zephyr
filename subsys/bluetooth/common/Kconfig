@@ -95,7 +95,7 @@ config BT_BUF_ACL_RX_SIZE
 config BT_BUF_ACL_RX_COUNT
 	int "Number of incoming ACL data buffers"
 	default NET_BUF_RX_COUNT if NET_L2_BT
-	default 3 if BT_RECV_IS_RX_THREAD
+	default 3 if BT_RECV_BLOCKING
 	default 6
 	range 1 64
 	help
@@ -126,7 +126,7 @@ config BT_BUF_EVT_RX_SIZE
 
 config BT_BUF_EVT_RX_COUNT
 	int "Number of HCI Event buffers"
-	default 3 if BT_RECV_IS_RX_THREAD
+	default 3 if BT_RECV_BLOCKING
 	default 20 if (BT_MESH && !(BT_BUF_EVT_DISCARDABLE_COUNT > 0))
 	default 10
 	range 2 255
@@ -136,11 +136,13 @@ config BT_BUF_EVT_RX_COUNT
 
 config BT_BUF_EVT_DISCARDABLE_SIZE
 	int "Maximum supported discardable HCI Event buffer length"
-	range 43 255
+	range 43 255 if !BT_EXT_ADV
+	range 58 255 if BT_EXT_ADV
 	# LE Extended Advertising Report event
 	default 255 if BT_BREDR
 	# Le Advertising Report event
-	default 43
+	default 43 if !BT_EXT_ADV
+	default 58 if BT_EXT_ADV
 	help
 	  Maximum support discardable HCI event size of buffers in the separate
 	  discardable event buffer pool. This value does not include the
@@ -214,6 +216,20 @@ config BT_HCI_VS_EXT
 	  Host and/or Controller. This enables  Write BD_ADDR, Read Build Info,
 	  Read Static Addresses and Read Key Hierarchy Roots vendor commands.
 
+config BT_HCI_VS_EVT
+	bool "Zephyr HCI Vendor-Specific Events"
+	depends on BT_HCI_VS_EXT
+	help
+	  Enable support for the Zephyr HCI Vendor-Specific Events in the
+	  Host and/or Controller.
+
+config BT_HCI_VS_FATAL_ERROR
+	bool "Allow vendor specific HCI event Zephyr Fatal Error"
+	depends on BT_HCI_VS_EXT
+	help
+	  Enable emiting HCI Vendor-Specific events for system and Controller
+	  errors that are unrecoverable.
+
 config BT_HCI_VS_EXT_DETECT
 	bool "Use heuristics to guess HCI vendor extensions support in advance"
 	depends on BT_HCI_VS_EXT && !BT_CTLR
@@ -286,6 +302,9 @@ config BT_DEBUG_LOG
 	bool "Normal printf-style to console"
 	select BT_DEBUG
 	select LOG
+	imply LOG_FUNC_NAME_PREFIX_INF
+	imply LOG_FUNC_NAME_PREFIX_WRN
+	imply LOG_FUNC_NAME_PREFIX_ERR
 	help
 	  This option enables Bluetooth debug going to standard
 	  serial console.
@@ -313,6 +332,8 @@ config BT_DEBUG_MONITOR_RTT
 	depends on USE_SEGGER_RTT
 	depends on SEGGER_RTT_MAX_NUM_UP_BUFFERS >= 2
 	select BT_DEBUG
+	select LOG
+	select CONSOLE_HAS_DRIVER
 	select BT_MONITOR
 	help
 	  Use a custom logging protocol over the RTT buffer instead of
@@ -352,16 +373,28 @@ if BT_DEBUG
 
 config BT_DEBUG_HCI_DRIVER
 	bool "Bluetooth HCI driver debug"
+	select DEPRECATED
 	help
 	  This option enables debug support for the active
 	  Bluetooth HCI driver, including the Controller-side HCI layer
 	  when included in the build.
 
+module = BT_HCI_DRIVER
+legacy-debug-sym = BT_DEBUG_HCI_DRIVER
+module-str = "Bluetooth HCI driver"
+source "subsys/bluetooth/common/Kconfig.template.log_config_bt"
+
 config BT_DEBUG_RPA
 	bool "Bluetooth Resolvable Private Address (RPA) debug"
+	select DEPRECATED
 	depends on BT_RPA
 	help
 	  This option enables debug support for the Bluetooth
 	  Resolvable Private Address (RPA) generation and resolution.
+
+module = BT_RPA
+legacy-debug-sym = BT_DEBUG_RPA
+module-str = "Bluetooth Resolvable Private Address (RPA)"
+source "subsys/bluetooth/common/Kconfig.template.log_config_bt"
 
 endif # BT_DEBUG

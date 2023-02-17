@@ -7,17 +7,23 @@
 #define DT_DRV_COMPAT nxp_imx_gpio
 
 #include <errno.h>
-#include <device.h>
-#include <drivers/gpio.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/irq.h>
 #include <soc.h>
 #include <fsl_common.h>
 #include <fsl_gpio.h>
 
 #ifdef CONFIG_PINCTRL
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/pinctrl.h>
 #endif
 
-#include "gpio_utils.h"
+#include <zephyr/drivers/gpio/gpio_utils.h>
+
+struct gpio_pin_gaps {
+	uint8_t start;
+	uint8_t len;
+};
 
 struct mcux_igpio_config {
 	/* gpio_driver_config needs to be first */
@@ -25,7 +31,9 @@ struct mcux_igpio_config {
 	GPIO_Type *base;
 #ifdef CONFIG_PINCTRL
 	const struct pinctrl_soc_pinmux *pin_muxes;
+	const struct gpio_pin_gaps *pin_gaps;
 	uint8_t mux_count;
+	uint8_t gap_count;
 #endif
 };
 
@@ -44,13 +52,32 @@ static int mcux_igpio_configure(const struct device *dev,
 
 #ifdef CONFIG_PINCTRL
 	struct pinctrl_soc_pin pin_cfg;
+	int cfg_idx = pin, i;
 
-#ifdef CONFIG_SOC_SERIES_IMX_RT10XX
+	/* Some SOCs have non-contiguous gpio pin layouts, account for this */
+	for (i = 0; i < config->gap_count; i++) {
+		if (pin >= config->pin_gaps[i].start) {
+			if (pin < (config->pin_gaps[i].start +
+				config->pin_gaps[i].len)) {
+				/* Pin is not connected to a mux */
+				return -ENOTSUP;
+			}
+			cfg_idx -= config->pin_gaps[i].len;
+		}
+	}
+
+	/* Init pin configuration struct, and use pinctrl api to apply settings */
+	if (cfg_idx >= config->mux_count) {
+		/* Pin is not connected to a mux */
+		return -ENOTSUP;
+	}
+
 	/* Set appropriate bits in pin configuration register */
 	volatile uint32_t *gpio_cfg_reg =
-		(volatile uint32_t *)config->pin_muxes[pin].config_register;
+		(volatile uint32_t *)config->pin_muxes[cfg_idx].config_register;
 	uint32_t reg = *gpio_cfg_reg;
 
+#ifdef CONFIG_SOC_SERIES_IMX_RT10XX
 	if ((flags & GPIO_SINGLE_ENDED) != 0) {
 		/* Set ODE bit */
 		reg |= IOMUXC_SW_PAD_CTL_PAD_ODE_MASK;
@@ -71,11 +98,6 @@ static int mcux_igpio_configure(const struct device *dev,
 		reg &= ~IOMUXC_SW_PAD_CTL_PAD_PUE_MASK;
 	}
 #elif defined(CONFIG_SOC_SERIES_IMX_RT11XX)
-	/* Set appropriate bits in pin configuration register */
-	volatile uint32_t *gpio_cfg_reg =
-		(volatile uint32_t *)config->pin_muxes[pin].config_register;
-	uint32_t reg = *gpio_cfg_reg;
-
 	if (config->pin_muxes[pin].pue_mux) {
 		/* PUE type register layout (GPIO_AD pins) */
 		if ((flags & GPIO_SINGLE_ENDED) != 0) {
@@ -110,21 +132,21 @@ static int mcux_igpio_configure(const struct device *dev,
 			reg |= IOMUXC_SW_PAD_CTL_PAD_PUS_MASK;
 		}
 		/* PDRV/SNVS/LPSR reg have different ODE bits */
-		if (config->pin_muxes[pin].pdrv_mux) {
+		if (config->pin_muxes[cfg_idx].pdrv_mux) {
 			if ((flags & GPIO_SINGLE_ENDED) != 0) {
 				/* Set ODE bit */
 				reg |= IOMUXC_SW_PAD_CTL_PAD_ODE_MASK;
 			} else {
 				reg &= ~IOMUXC_SW_PAD_CTL_PAD_ODE_MASK;
 			}
-		} else if (config->pin_muxes[pin].lpsr_mux) {
+		} else if (config->pin_muxes[cfg_idx].lpsr_mux) {
 			if ((flags & GPIO_SINGLE_ENDED) != 0) {
 				/* Set ODE bit */
 				reg |= (IOMUXC_SW_PAD_CTL_PAD_ODE_MASK << 1);
 			} else {
 				reg &= ~(IOMUXC_SW_PAD_CTL_PAD_ODE_MASK << 1);
 			}
-		} else if (config->pin_muxes[pin].snvs_mux) {
+		} else if (config->pin_muxes[cfg_idx].snvs_mux) {
 			if ((flags & GPIO_SINGLE_ENDED) != 0) {
 				/* Set ODE bit */
 				reg |= (IOMUXC_SW_PAD_CTL_PAD_ODE_MASK << 2);
@@ -135,12 +157,41 @@ static int mcux_igpio_configure(const struct device *dev,
 
 
 	}
-
+#elif defined(CONFIG_SOC_SERIES_IMX8MQ_M4)
+	if ((flags & GPIO_SINGLE_ENDED) != 0) {
+		/* Set ODE bit */
+		reg |= (0x1 << MCUX_IMX_DRIVE_OPEN_DRAIN_SHIFT);
+	} else {
+		reg &= ~(0x1 << MCUX_IMX_DRIVE_OPEN_DRAIN_SHIFT);
+	}
+	if ((flags & GPIO_PULL_UP) != 0) {
+		reg |= (0x1 << MCUX_IMX_BIAS_PULL_UP_SHIFT);
+	}
+	if ((flag & GPIO_PULL_DOWN) != 0) {
+		return -ENOTSUP;
+	}
+#else
+	/* Default flags, should work for most SOCs */
+	if ((flags & GPIO_SINGLE_ENDED) != 0) {
+		/* Set ODE bit */
+		reg |= (0x1 << MCUX_IMX_DRIVE_OPEN_DRAIN_SHIFT);
+	} else {
+		reg &= ~(0x1 << MCUX_IMX_DRIVE_OPEN_DRAIN_SHIFT);
+	}
+	if (((flags & GPIO_PULL_UP) != 0) || ((flags & GPIO_PULL_DOWN) != 0)) {
+		reg |= (0x1 << MCUX_IMX_BIAS_PULL_ENABLE_SHIFT);
+		if (((flags & GPIO_PULL_UP) != 0)) {
+			reg |= (0x1 << MCUX_IMX_BIAS_PULL_UP_SHIFT);
+		} else {
+			reg &= ~(0x1 << MCUX_IMX_BIAS_PULL_UP_SHIFT);
+		}
+	} else {
+		/* Set pin to highz */
+		reg &= ~(0x1 << MCUX_IMX_BIAS_PULL_ENABLE_SHIFT);
+	}
 #endif /* CONFIG_SOC_SERIES_IMX_RT10XX */
 
-	/* Init pin configuration struct, and use pinctrl api to apply settings */
-	assert(pin < config->mux_count);
-	memcpy(&pin_cfg.pinmux, &config->pin_muxes[pin], sizeof(pin_cfg));
+	memcpy(&pin_cfg.pinmux, &config->pin_muxes[cfg_idx], sizeof(pin_cfg));
 	/* cfg register will be set by pinctrl_configure_pins */
 	pin_cfg.pin_ctrl_flags = reg;
 	pinctrl_configure_pins(&pin_cfg, 1, PINCTRL_REG_NONE);
@@ -317,14 +368,18 @@ static const struct gpio_driver_api mcux_igpio_driver_api = {
 
 #ifdef CONFIG_PINCTRL
 /* These macros will declare an array of pinctrl_soc_pinmux types */
-#define PINMUX_INIT(node, prop, idx) MCUX_RT_PINMUX(DT_PROP_BY_IDX(node, prop, idx)),
+#define PINMUX_INIT(node, prop, idx) MCUX_IMX_PINMUX(DT_PROP_BY_IDX(node, prop, idx)),
 #define MCUX_IGPIO_PIN_DECLARE(n)						\
 	const struct pinctrl_soc_pinmux mcux_igpio_pinmux_##n[] = {		\
 		DT_FOREACH_PROP_ELEM(DT_DRV_INST(n), pinmux, PINMUX_INIT)	\
-	};
+	};									\
+	const uint8_t mcux_igpio_pin_gaps_##n[] =				\
+		DT_INST_PROP_OR(n, gpio_reserved_ranges, {});
 #define MCUX_IGPIO_PIN_INIT(n)							\
 	.pin_muxes = mcux_igpio_pinmux_##n,					\
-	.mux_count = DT_PROP_LEN(DT_DRV_INST(n), pinmux),
+	.pin_gaps = (const struct gpio_pin_gaps *)mcux_igpio_pin_gaps_##n,	\
+	.mux_count = DT_PROP_LEN(DT_DRV_INST(n), pinmux),			\
+	.gap_count = (ARRAY_SIZE(mcux_igpio_pin_gaps_##n) / 2)
 #else
 #define MCUX_IGPIO_PIN_DECLARE(n)
 #define MCUX_IGPIO_PIN_INIT(n)
@@ -338,7 +393,7 @@ static const struct gpio_driver_api mcux_igpio_driver_api = {
 			    DEVICE_DT_INST_GET(n), 0);			\
 									\
 		irq_enable(DT_INST_IRQ_BY_IDX(n, i, irq));		\
-	} while (0)
+	} while (false)
 
 #define MCUX_IGPIO_INIT(n)						\
 	MCUX_IGPIO_PIN_DECLARE(n)					\

@@ -8,11 +8,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/irq.h>
 #define LOG_LEVEL CONFIG_WDT_LOG_LEVEL
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(wdt_mchp_xec);
 
-#include <drivers/watchdog.h>
+#include <zephyr/drivers/watchdog.h>
 #include <soc.h>
 #include <errno.h>
 

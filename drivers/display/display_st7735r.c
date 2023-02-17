@@ -13,14 +13,14 @@
 
 #include "display_st7735r.h"
 
-#include <device.h>
-#include <drivers/spi.h>
-#include <drivers/gpio.h>
-#include <pm/device.h>
-#include <sys/byteorder.h>
-#include <drivers/display.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/drivers/display.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(display_st7735r, CONFIG_DISPLAY_LOG_LEVEL);
 
 #define ST7735R_RESET_TIME              K_MSEC(1)
@@ -50,6 +50,8 @@ struct st7735r_config {
 	uint8_t frmctr3[6];
 	uint8_t gamctrp1[16];
 	uint8_t gamctrn1[16];
+	bool inversion_on;
+	bool rgb_is_inverted;
 };
 
 struct st7735r_data {
@@ -268,7 +270,16 @@ static void st7735r_get_capabilities(const struct device *dev,
 	memset(capabilities, 0, sizeof(struct display_capabilities));
 	capabilities->x_resolution = config->width;
 	capabilities->y_resolution = config->height;
-	if (config->madctl & ST7735R_MADCTL_BGR) {
+
+	/*
+	 * Invert the pixel format if rgb_is_inverted is enabled.
+	 * Report pixel format as the same format set in the MADCTL
+	 * if disabling the rgb_is_inverted option.
+	 * Or not so, reporting pixel format as RGB if MADCTL setting
+	 * is BGR. And also vice versa.
+	 * It is a workaround for supporting buggy modules that display RGB as BGR.
+	 */
+	if (!(config->madctl & ST7735R_MADCTL_BGR) != !config->rgb_is_inverted) {
 		capabilities->supported_pixel_formats = PIXEL_FORMAT_BGR_565;
 		capabilities->current_pixel_format = PIXEL_FORMAT_BGR_565;
 	} else {
@@ -377,7 +388,11 @@ static int st7735r_lcd_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = st7735r_transmit(dev, ST7735R_CMD_INV_OFF, NULL, 0);
+	if (config->inversion_on) {
+		ret = st7735r_transmit(dev, ST7735R_CMD_INV_ON, NULL, 0);
+	} else {
+		ret = st7735r_transmit(dev, ST7735R_CMD_INV_OFF, NULL, 0);
+	}
 	if (ret < 0) {
 		return ret;
 	}
@@ -434,7 +449,7 @@ static int st7735r_init(const struct device *dev)
 	const struct st7735r_config *config = dev->config;
 	int ret;
 
-	if (!spi_is_ready(&config->bus)) {
+	if (!spi_is_ready_dt(&config->bus)) {
 		LOG_ERR("SPI bus %s not ready", config->bus.bus->name);
 		return -ENODEV;
 	}
@@ -545,6 +560,8 @@ static const struct display_driver_api st7735r_api = {
 		.frmctr3 = DT_INST_PROP(inst, frmctr3),				\
 		.gamctrp1 = DT_INST_PROP(inst, gamctrp1),			\
 		.gamctrn1 = DT_INST_PROP(inst, gamctrn1),			\
+		.inversion_on = DT_INST_PROP(inst, inversion_on),		\
+		.rgb_is_inverted = DT_INST_PROP(inst, rgb_is_inverted),		\
 	};									\
 										\
 	static struct st7735r_data st7735r_data_ ## inst = {			\

@@ -5,7 +5,7 @@
  */
 
 #include <stdint.h>
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 #include "lwm2m_engine.h"
 #include "lwm2m_rw_link_format.h"
@@ -28,10 +28,13 @@ LOG_MODULE_REGISTER(net_lwm2m_link_format, CONFIG_LWM2M_LOG_LEVEL);
  * missing.
  */
 
-#if defined(CONFIG_LWM2M_RW_JSON_SUPPORT)
-#define RESOURCE_TYPE		";rt=\"oma.lwm2m\""
 
-#define REG_PREFACE		"</>" RESOURCE_TYPE \
+#if defined(CONFIG_LWM2M_RW_SENML_CBOR_SUPPORT)
+#define REG_PREFACE		"</>;ct=" STRINGIFY(LWM2M_FORMAT_APP_SENML_CBOR)
+#elif defined(CONFIG_LWM2M_RW_SENML_JSON_SUPPORT)
+#define REG_PREFACE		"</>;ct=" STRINGIFY(LWM2M_FORMAT_APP_SEML_JSON)
+#elif defined(CONFIG_LWM2M_RW_JSON_SUPPORT)
+#define REG_PREFACE		"</>;rt=\"oma.lwm2m\"" \
 				";ct=" STRINGIFY(LWM2M_FORMAT_OMA_JSON)
 #else
 #define REG_PREFACE		""
@@ -61,8 +64,8 @@ static int put_begin(struct lwm2m_output_context *out,
 		break;
 
 	case LINK_FORMAT_MODE_REGISTER:
-		/* Only indicate content type if json is enabled.  */
-		if (!IS_ENABLED(CONFIG_LWM2M_RW_JSON_SUPPORT)) {
+		/* No need to append content type */
+		if (strlen(REG_PREFACE) == 0) {
 			return 0;
 		}
 
@@ -262,13 +265,7 @@ static int put_corelink_ssid(struct lwm2m_output_context *out,
 	case LWM2M_OBJECT_SECURITY_ID: {
 		bool bootstrap_inst;
 
-		ret = snprintk(buf, buflen, "0/%d/1",
-			       path->obj_inst_id);
-		if (ret < 0 || ret >= buflen) {
-			return -ENOMEM;
-		}
-
-		ret = lwm2m_engine_get_bool(buf, &bootstrap_inst);
+		ret = lwm2m_get_bool(&LWM2M_OBJ(0, path->obj_inst_id, 1), &bootstrap_inst);
 		if (ret < 0) {
 			return ret;
 		}
@@ -280,13 +277,11 @@ static int put_corelink_ssid(struct lwm2m_output_context *out,
 			return 0;
 		}
 
-		ret = snprintk(buf, buflen, "0/%d/10",
-				path->obj_inst_id);
 		if (ret < 0 || ret >= buflen) {
 			return -ENOMEM;
 		}
 
-		ret = lwm2m_engine_get_u16(buf, &server_id);
+		ret = lwm2m_get_u16(&LWM2M_OBJ(0, path->obj_inst_id, 10), &server_id);
 		if (ret < 0) {
 			return ret;
 		}
@@ -295,12 +290,7 @@ static int put_corelink_ssid(struct lwm2m_output_context *out,
 	}
 
 	case LWM2M_OBJECT_SERVER_ID:
-		ret = snprintk(buf, buflen, "1/%d/0", path->obj_inst_id);
-		if (ret < 0 || ret >= buflen) {
-			return -ENOMEM;
-		}
-
-		ret = lwm2m_engine_get_u16(buf, &server_id);
+		ret = lwm2m_get_u16(&LWM2M_OBJ(1, path->obj_inst_id, 0), &server_id);
 		if (ret < 0) {
 			return ret;
 		}

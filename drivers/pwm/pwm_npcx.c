@@ -6,14 +6,15 @@
 
 #define DT_DRV_COMPAT nuvoton_npcx_pwm
 
-#include <assert.h>
-#include <drivers/pwm.h>
-#include <dt-bindings/clock/npcx_clock.h>
-#include <drivers/clock_control.h>
-#include <kernel.h>
+#include <zephyr/drivers/pinctrl.h>
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/dt-bindings/clock/npcx_clock.h>
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/kernel.h>
 #include <soc.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
+
 LOG_MODULE_REGISTER(pwm_npcx, LOG_LEVEL_ERR);
 
 /* 16-bit period cycles/prescaler in NPCX PWM modules */
@@ -35,14 +36,11 @@ LOG_MODULE_REGISTER(pwm_npcx, LOG_LEVEL_ERR);
 /* Device config */
 struct pwm_npcx_config {
 	/* pwm controller base address */
-	uintptr_t base;
+	struct pwm_reg *base;
 	/* clock configuration */
 	struct npcx_clk_cfg clk_cfg;
-	/* Output buffer - open drain */
-	const bool is_od;
 	/* pinmux configuration */
-	const uint8_t alts_size;
-	const struct npcx_alt *alts_list;
+	const struct pinctrl_dev_config *pcfg;
 };
 
 /* Driver data */
@@ -51,14 +49,11 @@ struct pwm_npcx_data {
 	uint32_t cycles_per_sec;
 };
 
-/* Driver convenience defines */
-#define HAL_INSTANCE(dev) ((struct pwm_reg *)((const struct pwm_npcx_config *)(dev)->config)->base)
-
 /* PWM local functions */
 static void pwm_npcx_configure(const struct device *dev, int clk_bus)
 {
-	const struct pwm_npcx_config *const config = dev->config;
-	struct pwm_reg *const inst = HAL_INSTANCE(dev);
+	const struct pwm_npcx_config *config = dev->config;
+	struct pwm_reg *inst = config->base;
 
 	/* Disable PWM for module configuration first */
 	inst->PWMCTL &= ~BIT(NPCX_PWMCTL_PWR);
@@ -79,32 +74,23 @@ static void pwm_npcx_configure(const struct device *dev, int clk_bus)
 		inst->PWMCTL |= BIT(NPCX_PWMCTL_CKSEL);
 	else
 		inst->PWMCTL &= ~BIT(NPCX_PWMCTL_CKSEL);
-
-	/* Select output buffer type of io pad */
-	if (config->is_od)
-		inst->PWMCTLEX |= BIT(NPCX_PWMCTLEX_OD_OUT);
-	else
-		inst->PWMCTLEX &= ~BIT(NPCX_PWMCTLEX_OD_OUT);
 }
 
 /* PWM api functions */
-static int pwm_npcx_pin_set(const struct device *dev, uint32_t pwm,
-			   uint32_t period_cycles, uint32_t pulse_cycles,
-			   pwm_flags_t flags)
+static int pwm_npcx_set_cycles(const struct device *dev, uint32_t channel,
+			       uint32_t period_cycles, uint32_t pulse_cycles,
+			       pwm_flags_t flags)
 {
 	/* Single channel for each pwm device */
-	ARG_UNUSED(pwm);
+	ARG_UNUSED(channel);
+	const struct pwm_npcx_config *config = dev->config;
 	struct pwm_npcx_data *const data = dev->data;
-	struct pwm_reg *const inst = HAL_INSTANCE(dev);
+	struct pwm_reg *inst = config->base;
 	int prescaler;
 	uint32_t ctl;
 	uint32_t ctr;
 	uint32_t dcr;
 	uint32_t prsc;
-
-	if (pulse_cycles > period_cycles) {
-		return -EINVAL;
-	}
 
 	ctl = inst->PWMCTL | BIT(NPCX_PWMCTL_PWR);
 
@@ -164,11 +150,11 @@ static int pwm_npcx_pin_set(const struct device *dev, uint32_t pwm,
 	return 0;
 }
 
-static int pwm_npcx_get_cycles_per_sec(const struct device *dev, uint32_t pwm,
-				      uint64_t *cycles)
+static int pwm_npcx_get_cycles_per_sec(const struct device *dev,
+				       uint32_t channel, uint64_t *cycles)
 {
 	/* Single channel for each pwm device */
-	ARG_UNUSED(pwm);
+	ARG_UNUSED(channel);
 	struct pwm_npcx_data *const data = dev->data;
 
 	*cycles = data->cycles_per_sec;
@@ -177,7 +163,7 @@ static int pwm_npcx_get_cycles_per_sec(const struct device *dev, uint32_t pwm,
 
 /* PWM driver registration */
 static const struct pwm_driver_api pwm_npcx_driver_api = {
-	.pin_set = pwm_npcx_pin_set,
+	.set_cycles = pwm_npcx_set_cycles,
 	.get_cycles_per_sec = pwm_npcx_get_cycles_per_sec
 };
 
@@ -185,7 +171,7 @@ static int pwm_npcx_init(const struct device *dev)
 {
 	const struct pwm_npcx_config *const config = dev->config;
 	struct pwm_npcx_data *const data = dev->data;
-	struct pwm_reg *const inst = HAL_INSTANCE(dev);
+	struct pwm_reg *const inst = config->base;
 	const struct device *const clk_dev = DEVICE_DT_GET(NPCX_CLK_CTRL_NODE);
 	int ret;
 
@@ -196,6 +182,11 @@ static int pwm_npcx_init(const struct device *dev)
 	 */
 	NPCX_REG_WORD_ACCESS_CHECK(inst->PRSC, 0xA55A);
 
+
+	if (!device_is_ready(clk_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
 
 	/* Turn on device clock first and get source clock freq. */
 	ret = clock_control_on(clk_dev, (clock_control_subsys_t *)
@@ -216,21 +207,22 @@ static int pwm_npcx_init(const struct device *dev)
 	pwm_npcx_configure(dev, config->clk_cfg.bus);
 
 	/* Configure pin-mux for PWM device */
-	npcx_pinctrl_mux_configure(config->alts_list, config->alts_size, 1);
+	ret = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_DEFAULT);
+	if (ret < 0) {
+		LOG_ERR("PWM pinctrl setup failed (%d)", ret);
+		return ret;
+	}
 
 	return 0;
 }
 
 #define NPCX_PWM_INIT(inst)                                                    \
-	static const struct npcx_alt pwm_alts##inst[] =			       \
-					NPCX_DT_ALT_ITEMS_LIST(inst);          \
+	PINCTRL_DT_INST_DEFINE(inst);					       \
 									       \
 	static const struct pwm_npcx_config pwm_npcx_cfg_##inst = {            \
-		.base = DT_INST_REG_ADDR(inst),                                \
+		.base = (struct pwm_reg *)DT_INST_REG_ADDR(inst),              \
 		.clk_cfg = NPCX_DT_CLK_CFG_ITEM(inst),                         \
-		.is_od = DT_INST_PROP(inst, drive_open_drain),                 \
-		.alts_size = ARRAY_SIZE(pwm_alts##inst),                       \
-		.alts_list = pwm_alts##inst,                                   \
+		.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(inst),                  \
 	};                                                                     \
 									       \
 	static struct pwm_npcx_data pwm_npcx_data_##inst;                      \
@@ -238,7 +230,7 @@ static int pwm_npcx_init(const struct device *dev)
 	DEVICE_DT_INST_DEFINE(inst,					       \
 			    &pwm_npcx_init, NULL,			       \
 			    &pwm_npcx_data_##inst, &pwm_npcx_cfg_##inst,       \
-			    PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEVICE,  \
+			    PRE_KERNEL_1, CONFIG_PWM_INIT_PRIORITY,	       \
 			    &pwm_npcx_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(NPCX_PWM_INIT)

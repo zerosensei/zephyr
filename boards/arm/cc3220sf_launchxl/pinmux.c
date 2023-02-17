@@ -55,9 +55,7 @@
  * at runtime.
  */
 
-#include <init.h>
-
-#include <drivers/pinmux.h>
+#include <zephyr/init.h>
 
 #include <inc/hw_types.h>
 #include <inc/hw_memmap.h>

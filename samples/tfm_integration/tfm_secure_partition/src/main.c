@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <tfm_veneers.h>
+#include <zephyr/kernel.h>
 #include <tfm_ns_interface.h>
 
 #include "dummy_partition.h"
@@ -17,7 +16,9 @@ void main(void)
 	for (int key = 0; key < 6; key++) {
 		psa_status_t status = dp_secret_digest(key, digest, sizeof(digest));
 
-		if (status != PSA_SUCCESS) {
+		if (status == PSA_ERROR_INVALID_ARGUMENT && key == 5) {
+			printk("No valid secret for key, received expected error code\n");
+		} else if (status != PSA_SUCCESS) {
 			printk("Status: %d\n", status);
 		} else {
 			printk("Digest: ");

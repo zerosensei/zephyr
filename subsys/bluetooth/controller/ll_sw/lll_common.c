@@ -6,16 +6,13 @@
 
 #include <errno.h>
 #include <zephyr/types.h>
-#include <device.h>
+#include <zephyr/device.h>
 
 #include "util/mem.h"
 #include "util/memq.h"
 
 #include "lll.h"
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
-#define LOG_MODULE_NAME bt_ctlr_lll_common
-#include "common/log.h"
 #include "hal/debug.h"
 
 /**

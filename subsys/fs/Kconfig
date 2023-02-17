@@ -51,18 +51,24 @@ config FILE_SYSTEM_SHELL
 	  This shell provides basic browsing of the contents of the
 	  file system.
 
+config FILE_SYSTEM_MKFS
+	bool "Allow to format file system"
+	help
+		Enables function fs_mkfs that can be used to format a storage
+		device.
+
 config FUSE_FS_ACCESS
 	bool "FUSE based access to file system partitions"
 	depends on ARCH_POSIX
 	help
 	  Expose file system partitions to the host system through FUSE.
 
-source "subsys/fs/Kconfig.fatfs"
-source "subsys/fs/Kconfig.littlefs"
+rsource "Kconfig.fatfs"
+rsource "Kconfig.littlefs"
 
 endif # FILE_SYSTEM
 
-source "subsys/fs/fcb/Kconfig"
-source "subsys/fs/nvs/Kconfig"
+rsource "fcb/Kconfig"
+rsource "nvs/Kconfig"
 
 endmenu

@@ -8,21 +8,21 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/printk.h>
-#include <sys/byteorder.h>
-#include <zephyr.h>
-#include <init.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/kernel.h>
+#include <zephyr/init.h>
 
-#include <net/buf.h>
+#include <zephyr/net/buf.h>
 
 #include "ots_l2cap_internal.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 /* This l2cap is the only OTS-file in use for OTC.
  * If only OTC is used, the OTS log module must be registered here.
  */
-#if IS_ENABLED(CONFIG_BT_OTS)
+#if defined(CONFIG_BT_OTS)
 LOG_MODULE_DECLARE(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);
 #elif IS_ENABLED(CONFIG_BT_OTS_CLIENT)
 LOG_MODULE_REGISTER(bt_ots, CONFIG_BT_OTS_LOG_LEVEL);

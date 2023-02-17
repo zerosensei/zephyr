@@ -8,6 +8,7 @@
 
 import sys
 import argparse
+import colorama
 from colorama import Fore
 
 INVALID_INPUT = -1
@@ -179,7 +180,7 @@ def _create_parser(arg_list):
     else parses the given string
     """
 
-    parser = argparse.ArgumentParser(conflict_handler='resolve')
+    parser = argparse.ArgumentParser(conflict_handler='resolve', allow_abbrev=False)
     parser.add_argument("-i", nargs='?', dest="input")
     parser.add_argument("-o", nargs='?', dest="output")
     parser.add_argument("-chip", dest="chip")
@@ -244,3 +245,5 @@ def exit_with_failure(message):
     print(Fore.RED + message)
 
     sys.exit(EXIT_FAILURE_STATUS)
+
+colorama.init()

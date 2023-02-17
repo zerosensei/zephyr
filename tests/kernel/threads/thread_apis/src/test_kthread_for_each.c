@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
-#include <irq_offload.h>
-#include <debug/stack.h>
+#include <zephyr/ztest.h>
+#include <zephyr/irq_offload.h>
+#include <zephyr/debug/stack.h>
 
 #include "tests_thread_apis.h"
 
@@ -82,7 +82,7 @@ void thread_callback_unlocked(const struct k_thread *thread, void *user_data)
  *
  * @see k_thread_foreach()
  */
-void test_k_thread_foreach(void)
+ZTEST(threads_lifecycle_1cpu, test_k_thread_foreach)
 {
 	int count;
 
@@ -128,7 +128,7 @@ void test_k_thread_foreach(void)
  * @see k_thread_foreach_unlocked()
  * @ingroup kernel_thread_tests
  */
-void test_k_thread_foreach_unlocked(void)
+ZTEST(threads_lifecycle_1cpu, test_k_thread_foreach_unlocked)
 {
 	int count;
 
@@ -185,8 +185,7 @@ void test_k_thread_foreach_unlocked(void)
  * @see k_thread_foreach()
  * @ingroup kernel_thread_tests
  */
-
-void test_k_thread_foreach_null_cb(void)
+ZTEST(threads_lifecycle_1cpu, test_k_thread_foreach_null_cb)
 {
 	k_thread_foreach(NULL, TEST_STRING);
 }
@@ -201,7 +200,7 @@ void test_k_thread_foreach_null_cb(void)
  * @ingroup kernel_thread_tests
  */
 
-void test_k_thread_foreach_unlocked_null_cb(void)
+ZTEST(threads_lifecycle_1cpu, test_k_thread_foreach_unlocked_null_cb)
 {
 	k_thread_foreach_unlocked(NULL, TEST_STRING_UNLOCKED);
 }
@@ -217,34 +216,52 @@ void test_k_thread_foreach_unlocked_null_cb(void)
  * @see k_thread_state_str()
  * @ingroup kernel_thread_tests
  */
-void test_k_thread_state_str(void)
+ZTEST(threads_lifecycle_1cpu, test_k_thread_state_str)
 {
+	char state_str[32];
+	const char *str;
 	k_tid_t tid = &tdata1;
 
 	tid->base.thread_state = 0;
-	zassert_true(strcmp(k_thread_state_str(tid), "") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "") == 0);
 
 	tid->base.thread_state = _THREAD_DUMMY;
-	zassert_true(strcmp(k_thread_state_str(tid), "dummy") == 0, NULL);
+
+	str = k_thread_state_str(tid, NULL, sizeof(state_str));
+	zassert_true(strcmp(str, "") == 0);
+
+	str = k_thread_state_str(tid, state_str, 0);
+	zassert_true(strcmp(str, "") == 0);
+
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "dummy") == 0);
 
 	tid->base.thread_state = _THREAD_PENDING;
-	zassert_true(strcmp(k_thread_state_str(tid), "pending") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "pending") == 0);
 
 	tid->base.thread_state = _THREAD_PRESTART;
-	zassert_true(strcmp(k_thread_state_str(tid), "prestart") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "prestart") == 0);
 
 	tid->base.thread_state = _THREAD_DEAD;
-	zassert_true(strcmp(k_thread_state_str(tid), "dead") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "dead") == 0);
 
 	tid->base.thread_state = _THREAD_SUSPENDED;
-	zassert_true(strcmp(k_thread_state_str(tid), "suspended") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "suspended") == 0);
 
 	tid->base.thread_state = _THREAD_ABORTING;
-	zassert_true(strcmp(k_thread_state_str(tid), "aborting") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "aborting") == 0);
 
 	tid->base.thread_state = _THREAD_QUEUED;
-	zassert_true(strcmp(k_thread_state_str(tid), "queued") == 0, NULL);
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "queued") == 0);
 
-	tid->base.thread_state = 0xFF;
-	zassert_true(strcmp(k_thread_state_str(tid), "unknown") == 0, NULL);
+	tid->base.thread_state = _THREAD_PENDING | _THREAD_SUSPENDED;
+	str = k_thread_state_str(tid, state_str, sizeof(state_str));
+	zassert_true(strcmp(str, "pending+suspended") == 0);
 }

@@ -15,12 +15,12 @@
 
 #include "clock.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(spi_telink);
 
-#include <drivers/spi.h>
+#include <zephyr/drivers/spi.h>
 #include "spi_context.h"
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/pinctrl.h>
 
 
 #define CHIP_SELECT_COUNT               3u
@@ -233,7 +233,7 @@ static void spi_b91_txrx(const struct device *dev, uint32_t len)
 	};
 
 	/* context complete */
-	spi_context_complete(ctx, 0);
+	spi_context_complete(ctx, dev, 0);
 }
 
 /* Check for supported configuration */
@@ -393,7 +393,7 @@ static int spi_b91_transceive(const struct device *dev,
 	}
 
 	/* context setup */
-	spi_context_lock(&data->ctx, false, NULL, config);
+	spi_context_lock(&data->ctx, false, NULL, NULL, config);
 	spi_context_buffers_setup(&data->ctx, tx_bufs, rx_bufs, 1);
 
 	/* if cs is defined: software cs control, set active true */
@@ -422,13 +422,15 @@ static int spi_b91_transceive_async(const struct device *dev,
 				    const struct spi_config *config,
 				    const struct spi_buf_set *tx_bufs,
 				    const struct spi_buf_set *rx_bufs,
-				    struct k_poll_signal *async)
+				    spi_callback_t cb,
+				    void *userdata)
 {
 	ARG_UNUSED(dev);
 	ARG_UNUSED(config);
 	ARG_UNUSED(tx_bufs);
 	ARG_UNUSED(rx_bufs);
-	ARG_UNUSED(async);
+	ARG_UNUSED(cb);
+	ARG_UNUSED(userdata);
 
 	return -ENOTSUP;
 }
@@ -471,9 +473,9 @@ static struct spi_driver_api spi_b91_api = {
 									  \
 	static struct spi_b91_cfg spi_b91_cfg_##inst = {		  \
 		.peripheral_id = DT_INST_ENUM_IDX(inst, peripheral_id),	  \
-		.cs_pin[0] = DT_STRING_TOKEN(DT_DRV_INST(inst), cs0_pin), \
-		.cs_pin[1] = DT_STRING_TOKEN(DT_DRV_INST(inst), cs1_pin), \
-		.cs_pin[2] = DT_STRING_TOKEN(DT_DRV_INST(inst), cs2_pin), \
+		.cs_pin[0] = DT_INST_STRING_TOKEN(inst, cs0_pin),	  \
+		.cs_pin[1] = DT_INST_STRING_TOKEN(inst, cs1_pin),	  \
+		.cs_pin[2] = DT_INST_STRING_TOKEN(inst, cs2_pin),	  \
 		.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(inst),		  \
 	};								  \
 									  \

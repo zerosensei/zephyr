@@ -8,13 +8,13 @@
 #define DT_DRV_COMPAT atmel_sam0_gpio
 
 #include <errno.h>
-#include <device.h>
-#include <drivers/gpio.h>
-#include <dt-bindings/gpio/atmel-sam0-gpio.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/dt-bindings/gpio/atmel-sam0-gpio.h>
 #include <soc.h>
-#include <drivers/interrupt_controller/sam0_eic.h>
+#include <zephyr/drivers/interrupt_controller/sam0_eic.h>
 
-#include "gpio_utils.h"
+#include <zephyr/drivers/gpio/gpio_utils.h>
 
 #ifndef PORT_PMUX_PMUXE_A_Val
 #define PORT_PMUX_PMUXE_A_Val (0)

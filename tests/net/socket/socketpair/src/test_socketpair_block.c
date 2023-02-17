@@ -4,17 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifdef CONFIG_ARCH_POSIX
 #include <fcntl.h>
+#else
+#include <zephyr/posix/fcntl.h>
+#endif
+
 #include <string.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(net_test, CONFIG_NET_SOCKETS_LOG_LEVEL);
 
-#include <net/socket.h>
-#include <sys/util.h>
-#include <posix/unistd.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/posix/unistd.h>
 
-#include <ztest_assert.h>
+#include <zephyr/ztest_assert.h>
 
 #include "test_socketpair_thread.h"
 
@@ -73,7 +78,7 @@ static void work_handler(struct k_work *work)
 	}
 }
 
-void test_socketpair_write_block(void)
+ZTEST(net_socketpair, test_socketpair_write_block)
 {
 	int res;
 	int sv[2] = {-1, -1};
@@ -122,7 +127,7 @@ void test_socketpair_write_block(void)
 	close(sv[1]);
 }
 
-void test_socketpair_read_block(void)
+ZTEST(net_socketpair, test_socketpair_read_block)
 {
 	int res;
 	char x;

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <sys/atomic.h>
-#include <kernel.h>
-#include <drivers/entropy.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/entropy.h>
 #include <string.h>
 
-static const struct device *entropy_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
+static const struct device *const entropy_dev =
+	DEVICE_DT_GET(DT_CHOSEN(zephyr_entropy));
 
 #if defined(CONFIG_ENTROPY_DEVICE_RANDOM_GENERATOR)
 uint32_t z_impl_sys_rand32_get(void)

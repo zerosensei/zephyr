@@ -11,11 +11,11 @@
  * on ARM64 Cortex-A (AArch64)
  */
 
-#include <toolchain.h>
-#include <linker/sections.h>
+#include <zephyr/toolchain.h>
+#include <zephyr/linker/sections.h>
 #include <offsets_short.h>
-#include <arch/cpu.h>
-#include <syscall.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/syscall.h>
 #include "macro_priv.inc"
 
 _ASM_FILE_PROLOGUE
@@ -99,15 +99,15 @@ SECTION_FUNC(TEXT, z_arm64_context_switch)
 	mov	sp, x4
 
 #ifdef CONFIG_USERSPACE
-	stp     xzr, x30, [sp, #-16]!
+	str     lr, [sp, #-16]!
 	bl      z_arm64_swap_mem_domains
-	ldp     xzr, x30, [sp], #16
+	ldr     lr, [sp], #16
 #endif
 
 #ifdef CONFIG_INSTRUMENT_THREAD_SWITCHING
-	stp	xzr, x30, [sp, #-16]!
+	str	lr, [sp, #-16]!
 	bl	z_thread_mark_switched_in
-	ldp	xzr, x30, [sp], #16
+	ldr	lr, [sp], #16
 #endif
 
 	/* Return to arch_switch() or _isr_wrapper() */

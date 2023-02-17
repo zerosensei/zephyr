@@ -7,10 +7,11 @@
 #define DT_DRV_COMPAT atmel_sam0_adc
 
 #include <soc.h>
-#include <drivers/adc.h>
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/adc.h>
+#include <zephyr/drivers/pinctrl.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(adc_sam0, CONFIG_ADC_LOG_LEVEL);
 
 #define ADC_CONTEXT_USES_KERNEL_TIMER
@@ -133,7 +134,6 @@ static int adc_sam0_channel_setup(const struct device *dev,
 	adc->SAMPCTRL.reg = sampctrl;
 	wait_synchronization(adc);
 
-
 	uint8_t refctrl;
 
 	switch (channel_cfg->reference) {
@@ -142,27 +142,37 @@ static int adc_sam0_channel_setup(const struct device *dev,
 		/* Enable the internal bandgap reference */
 		ADC_BGEN = 1;
 		break;
-	case ADC_REF_VDD_1_2:
-		refctrl = ADC_REFCTRL_REFSEL_VDD_1_2 | ADC_REFCTRL_REFCOMP;
-		break;
 #ifdef ADC_REFCTRL_REFSEL_VDD_1
 	case ADC_REF_VDD_1:
 		refctrl = ADC_REFCTRL_REFSEL_VDD_1 | ADC_REFCTRL_REFCOMP;
 		break;
 #endif
+	case ADC_REF_VDD_1_2:
+		refctrl = ADC_REFCTRL_REFSEL_VDD_1_2 | ADC_REFCTRL_REFCOMP;
+		break;
 	case ADC_REF_EXTERNAL0:
 		refctrl = ADC_REFCTRL_REFSEL_AREFA;
 		break;
+#ifdef ADC_REFCTRL_REFSEL_AREFB
 	case ADC_REF_EXTERNAL1:
 		refctrl = ADC_REFCTRL_REFSEL_AREFB;
 		break;
+#endif
 	default:
 		LOG_ERR("Selected reference is not valid");
 		return -EINVAL;
 	}
 	if (adc->REFCTRL.reg != refctrl) {
+#ifdef ADC_SAM0_REFERENCE_ENABLE_PROTECTED
+		adc->CTRLA.bit.ENABLE = 0;
+		wait_synchronization(adc);
+#endif
 		adc->REFCTRL.reg = refctrl;
 		wait_synchronization(adc);
+#ifdef ADC_SAM0_REFERENCE_ENABLE_PROTECTED
+		adc->CTRLA.bit.ENABLE = 1;
+		wait_synchronization(adc);
+#endif
 #ifdef ADC_SAM0_REFERENCE_GLITCH
 		struct adc_sam0_data *data = dev->data;
 
@@ -442,7 +452,7 @@ static int adc_sam0_init(const struct device *dev)
 #ifdef MCLK
 	GCLK->PCHCTRL[cfg->gclk_id].reg = cfg->gclk_mask | GCLK_PCHCTRL_CHEN;
 
-	MCLK->APBDMASK.reg |= cfg->mclk_mask;
+	MCLK_ADC |= cfg->mclk_mask;
 #else
 	PM->APBCMASK.bit.ADC_ = 1;
 
@@ -519,7 +529,7 @@ do {									\
 	adc->CALIB.reg = ADC_SAM0_BIASCOMP(n)				\
 			 | ADC_SAM0_BIASR2R(n)				\
 			 | ADC_SAM0_BIASREFBUF(n);			\
-} while (0)
+} while (false)
 
 #else
 
@@ -544,7 +554,7 @@ do {									\
 		      ADC_FUSES_BIASCAL_Msk) >> ADC_FUSES_BIASCAL_Pos;	\
 	adc->CALIB.reg = ADC_CALIB_BIAS_CAL(bias) |			\
 			 ADC_CALIB_LINEARITY_CAL(lin);			\
-} while (0)
+} while (false)
 
 #endif
 

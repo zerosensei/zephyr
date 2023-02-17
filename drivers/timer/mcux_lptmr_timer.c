@@ -6,9 +6,12 @@
 
 #define DT_DRV_COMPAT nxp_kinetis_lptmr
 
-#include <device.h>
-#include <drivers/timer/system_timer.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/timer/system_timer.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/time_units.h>
 #include <fsl_lptmr.h>
+#include <zephyr/irq.h>
 
 BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) == 1,
 	     "No LPTMR instance enabled in devicetree");

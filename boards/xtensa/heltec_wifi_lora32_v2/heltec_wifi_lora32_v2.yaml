@@ -3,11 +3,14 @@ name: HELTEC WiFi LoRa 32 (V2) Board
 type: mcu
 arch: xtensa
 toolchain:
-  - espressif
+  - zephyr
 supported:
   - gpio
   - i2c
   - watchdog
   - uart
-  - pinmux
   - nvs
+testing:
+  ignore_tags:
+    - net
+    - bluetooth

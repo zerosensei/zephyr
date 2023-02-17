@@ -1,0 +1,11 @@
+# Copyright (c) 2023 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_SERIES_CH58X
+
+source "soc/riscv/riscv-privilege/wch/Kconfig.defconfig.ch58*"
+
+config SOC_SERIES
+    default "ch58"
+
+endif # SOC_SERIES_CH58X

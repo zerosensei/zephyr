@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
-#include <drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
 
 #include <ch32v30x.h>
 
@@ -86,6 +86,7 @@ void main(void)
 
 	if (!device_is_ready(led.port)) {
 		error(3);
+	if (!gpio_is_ready_dt(&led)) {
 		return;
 	}
 

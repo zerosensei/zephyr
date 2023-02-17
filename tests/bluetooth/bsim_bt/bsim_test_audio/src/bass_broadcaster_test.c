@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/bluetooth.h>
 #include "common.h"
 
 extern enum bst_result_t bst_result;
+
+/* TODO: Deprecate in favor of broadcast_source_test */
 
 #define BROADCAST_ID_ENCODE(broadcast_id)  \
 	(((broadcast_id) >>  0) & 0xFF), \

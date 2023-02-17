@@ -49,7 +49,14 @@ set(DOCS_DOCTREE_DIR ${CMAKE_CURRENT_BINARY_DIR}/doctrees)
 set(DOCS_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(DOCS_SRC_DIR ${CMAKE_CURRENT_BINARY_DIR}/src)
 set(DOCS_HTML_DIR ${CMAKE_CURRENT_BINARY_DIR}/html)
+set(DOCS_LINKCHECK_DIR ${CMAKE_CURRENT_BINARY_DIR}/linkcheck)
 set(DOCS_LATEX_DIR ${CMAKE_CURRENT_BINARY_DIR}/latex)
+
+if(WIN32)
+  set(SEP $<SEMICOLON>)
+else()
+  set(SEP :)
+endif()
 
 #-------------------------------------------------------------------------------
 # Functions
@@ -116,7 +123,7 @@ add_custom_target(
   ${PYTHON_EXECUTABLE} ${GEN_DEVICETREE_REST_SCRIPT}
     --vendor-prefixes ${ZEPHYR_BASE}/dts/bindings/vendor-prefixes.txt
     ${DTS_ARGS}
-    ${DOCS_SRC_DIR}/reference/devicetree
+    ${DOCS_SRC_DIR}/build/dts/api
   VERBATIM
   USES_TERMINAL
   COMMENT "Generating Devicetree bindings documentation..."
@@ -201,6 +208,33 @@ if(LATEX_PDFLATEX_FOUND AND LATEXMK)
 
   add_dependencies(pdf latex)
 endif()
+
+#-------------------------------------------------------------------------------
+# linkcheck
+
+add_doc_target(
+  linkcheck
+  COMMAND ${CMAKE_COMMAND} -E env ${SPHINX_ENV}
+  ${SPHINXBUILD}
+    -b linkcheck
+    -c ${DOCS_CFG_DIR}
+    -d ${DOCS_DOCTREE_DIR}
+    -w ${DOCS_BUILD_DIR}/linkcheck.log
+    -t ${DOC_TAG}
+    ${SPHINXOPTS}
+    ${DOCS_SRC_DIR}
+    ${DOCS_LINKCHECK_DIR}
+  USES_TERMINAL
+  COMMENT "Running Sphinx link check..."
+)
+
+set_target_properties(
+  linkcheck linkcheck-nodeps
+  PROPERTIES
+    ADDITIONAL_CLEAN_FILES "${DOCS_SRC_DIR};${DOCS_LINKCHECK_DIR};${DOCS_DOCTREE_DIR}"
+)
+
+add_dependencies(linkcheck devicetree)
 
 #-------------------------------------------------------------------------------
 # others

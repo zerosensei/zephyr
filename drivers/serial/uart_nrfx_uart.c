@@ -8,13 +8,14 @@
  * @brief Driver for Nordic Semiconductor nRF5X UART
  */
 
-#include <drivers/uart.h>
-#include <pm/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/irq.h>
 #include <soc.h>
 #include <hal/nrf_uart.h>
 
 #ifdef CONFIG_PINCTRL
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/pinctrl.h>
 #else
 #include <hal/nrf_gpio.h>
 #endif /* CONFIG_PINCTRL */
@@ -220,15 +221,19 @@ static int baudrate_set(const struct device *dev, uint32_t baudrate)
 	case 28800:
 		nrf_baudrate = NRF_UART_BAUDRATE_28800;
 		break;
+#if defined(UART_BAUDRATE_BAUDRATE_Baud31250)
 	case 31250:
 		nrf_baudrate = NRF_UART_BAUDRATE_31250;
 		break;
+#endif
 	case 38400:
 		nrf_baudrate = NRF_UART_BAUDRATE_38400;
 		break;
+#if defined(UART_BAUDRATE_BAUDRATE_Baud56000)
 	case 56000:
 		nrf_baudrate = NRF_UART_BAUDRATE_56000;
 		break;
+#endif
 	case 57600:
 		nrf_baudrate = NRF_UART_BAUDRATE_57600;
 		break;
@@ -559,7 +564,7 @@ static int uart_nrfx_rx_buf_rsp(const struct device *dev, uint8_t *buf,
 				size_t len)
 {
 	int err;
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	if (!uart0_cb.rx_enabled) {
 		err = -EACCES;
@@ -668,7 +673,7 @@ static void rx_isr(const struct device *dev)
 		}
 		rx_rdy_evt(dev);
 
-		int key = irq_lock();
+		unsigned int key = irq_lock();
 
 		if (uart0_cb.rx_secondary_buffer_length == 0) {
 			uart0_cb.rx_enabled = 0;
