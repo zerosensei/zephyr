@@ -1,0 +1,12 @@
+# Copyright (c) 2023 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_CH583M
+
+config SOC
+    default "CH583M"
+
+config NUM_IRQS
+	default 28
+
+endif # SOC_CH583

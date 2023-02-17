@@ -1,0 +1,16 @@
+# Copyright (c) 2023 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+choice
+    prompt "WCH CH58X SoC implementation"
+    depends on SOC_SERIES_CH58X
+
+config SOC_CH583M
+    bool "CH583M"
+    select RISCV_ISA_RV32I
+	select RISCV_ISA_EXT_M
+	select RISCV_ISA_EXT_A
+	select RISCV_ISA_EXT_C 
+
+
+endchoice

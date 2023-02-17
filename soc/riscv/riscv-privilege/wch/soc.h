@@ -7,6 +7,6 @@
 #ifndef SOC_RISCV_RISCV_PRIVILEGE_WCH_SOC_H
 #define SOC_RISCV_RISCV_PRIVILEGE_WCH_SOC_H
 
-
+#include <soc_common.h>
 
 #endif /* SOC_RISCV_RISCV_PRIVILEGE_WCH_SOC_H */
