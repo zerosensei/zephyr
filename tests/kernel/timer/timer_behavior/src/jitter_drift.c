@@ -271,6 +271,8 @@ static void do_test_using(void (*sample_collection_fn)(void))
 	double max_us_bound = test_period + period_max_drift_percentage * test_period
 		+ expected_period_drift;
 
+	printf("min_us_bound: %f\n", min_us_bound);
+
 	zassert_true(min_us >= min_us_bound,
 		"Shortest timer period too short (off by more than expected %d%)",
 		CONFIG_TIMER_TEST_PERIOD_MAX_DRIFT_PERCENT);

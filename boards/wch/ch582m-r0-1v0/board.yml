@@ -1,0 +1,5 @@
+board:
+  name: ch582m-r0-1v0
+  vendor: wch
+  socs:
+  - name: ch582

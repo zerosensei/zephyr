@@ -14,11 +14,22 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 
+#include <zephyr/debug/stack.h>
+
 static uint8_t mfg_data[] = { 0xff, 0xff, 0x00 };
 
 static const struct bt_data ad[] = {
 	BT_DATA(BT_DATA_MANUFACTURER_DATA, mfg_data, 3),
 };
+
+static void thread_callback(const struct k_thread *thread, void *user_data)
+{
+
+	printf("%s: tid: %p, prio: %d\n",
+				thread->name, thread, thread->base.prio);
+	log_stack_usage(thread);
+
+}
 
 int main(void)
 {
@@ -58,6 +69,8 @@ int main(void)
 
 		mfg_data[2]++;
 
+
+		k_thread_foreach(thread_callback, NULL);
 	} while (1);
 	return 0;
 }

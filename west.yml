@@ -23,6 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    - name: zerosensei
+      url-base: https://github.com/zerosensei
 
   group-filter: [-babblesim, -optional]
 
@@ -337,6 +339,13 @@ manifest:
     - name: zcbor
       revision: 75d088037eb237b18e7ec1f47c9ce494b9b95aab
       path: modules/lib/zcbor
+
+    - name: hal_wch
+      revision: 756291c35773b2a89bdb7278c1ae0da21d1966e6
+      path: modules/hal/wch
+      remote: zerosensei
+      groups:
+        - hal
 
   self:
     path: zephyr

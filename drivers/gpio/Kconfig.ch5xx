@@ -1,0 +1,9 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+config GPIO_CH5XX
+	bool "WCH CH5XX GPIO driver"
+	default y
+	depends on DT_HAS_WCH_CH5XX_GPIO_ENABLED
+	help
+	  Enable the GPIO driver on TI SimpleLink CC32xx boards

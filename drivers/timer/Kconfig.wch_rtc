@@ -1,0 +1,39 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+config WCH_RTC_TIMER
+	bool "WCH Real Time Counter Timer"
+	depends on CLOCK_CONTROL
+	select TICKLESS_CAPABLE
+	select SYSTEM_TIMER_HAS_DISABLE_SUPPORT
+	depends on !$(dt_nodelabel_enabled,rtc1)
+	help
+	  This module implements a kernel device driver for the WCH Real Time
+	  Counter and provides the standard "system clock driver" interfaces.
+
+if WCH_RTC_TIMER
+
+choice WCH_RTC_SOURCE
+    prompt "WCH RTC source select"
+    default WCH_RTC_LSI_32000
+
+config WCH_RTC_LSI_32000
+    bool "LSI 32000Hz"
+    help
+      Use LSI 32000Hz
+    
+config WCH_RTC_LSI_32768
+    bool "LSI 32768Hz"
+    help
+      Use LSI 32768Hz
+
+config WCH_RTC_LSE_32768
+    bool "LSE 32768Hz"
+    help
+      Use LSE 32768Hz
+
+endchoice
+
+# TODO:
+
+endif # WCH_RTC_TIMER

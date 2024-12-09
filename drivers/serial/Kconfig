@@ -274,4 +274,6 @@ source "drivers/serial/Kconfig.ene"
 
 source "drivers/serial/Kconfig.rzt2m"
 
+source "drivers/serial/Kconfig.ch32v"
+
 endif # SERIAL

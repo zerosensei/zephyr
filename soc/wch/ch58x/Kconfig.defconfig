@@ -1,0 +1,21 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_SERIES_CH58X
+
+rsource "Kconfig.defconfig.ch58*"
+
+# TODO: more?
+
+config WCH_RTC_TIMER
+	default y if SYS_CLOCK_EXISTS
+
+config SYS_CLOCK_TICKS_PER_SEC
+	default 32000 if WCH_RTC_LSI_32000
+	default 32768 if WCH_RTC_LSI_32768 || WCH_RTC_LSE_32768
+
+config SYS_CLOCK_HW_CYCLES_PER_SEC
+	default 32000 if WCH_RTC_LSI_32000
+	default 32768 if WCH_RTC_LSI_32768 || WCH_RTC_LSE_32768
+
+endif # SOC_SERIES_CH58X

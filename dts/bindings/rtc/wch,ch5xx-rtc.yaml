@@ -1,0 +1,23 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH RTC (Real-Time Counter)
+
+compatible: "wch,wch-rtc"
+
+include: rtc.yaml
+
+properties:
+  reg:
+    required: true
+    
+# TODO:
+  clk-source:
+    type: int
+    enum:
+     - 0
+     - 1
+     - 2
+    description: |
+      0: LSE 32768Hz, 1: LSI 32000Hz, 2: LSI 32768Hz
+      

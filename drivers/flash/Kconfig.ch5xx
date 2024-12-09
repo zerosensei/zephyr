@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config SOC_FLASH_CH5XX
+	bool "WCH CH5XX flash driver"
+	default y
+	depends on DT_HAS_ESPRESSIF_ESP32_FLASH_CONTROLLER_ENABLED
+	select FLASH_HAS_DRIVER_ENABLED
+	select FLASH_HAS_PAGE_LAYOUT
+	help
+	  Enable WCH flash driver.
+
+# config MPU_ALLOW_FLASH_WRITE
+# 	bool "Add MPU access to write to flash"
+# 	help
+# 	  Enable this to allow MPU RWX access to flash memory

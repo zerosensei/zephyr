@@ -1,0 +1,66 @@
+/*
+ * Copyright (c) 2024 zerosensei
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <wch/ch582m.dtsi>
+#include "ch582m-pinctrl.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    model = "WCH CH582M-R0-1v0";
+    compatible = "wch,ch582m-r0-1v0";
+
+    chosen {
+        zephyr,console = &uart1;
+		// zephyr,shell-uart = &cdc_acm_uart;
+        zephyr,sram = &sram0;
+        zephyr,flash = &flash_rom;
+    };
+
+    leds {
+        compatible = "gpio-leds";
+        led0: led_0 {
+            gpios = <&gpiob 18 GPIO_ACTIVE_LOW>;
+        	label = "Red LED 0";
+        };
+
+        led1: led_1 {
+            gpios = <&gpiob 19 GPIO_ACTIVE_LOW>;
+        	label = "Red LED 1";
+        };
+    };
+
+    keys {
+		compatible = "gpio-keys";
+        key1: key1 {
+            gpios = <&gpiob 4 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "KEY";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+    };
+
+    aliases {
+		led0 = &led0;
+		led1 = &led1;
+        sw0 = &key1;
+	};
+};
+
+&gpioa {
+	status = "okay";
+};
+
+&gpiob {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <1000000>;
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+};

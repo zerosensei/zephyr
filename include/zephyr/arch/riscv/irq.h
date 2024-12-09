@@ -22,6 +22,9 @@ extern "C" {
 #include <zephyr/irq.h>
 #include <zephyr/sw_isr_table.h>
 #include <stdbool.h>
+#include <soc.h>
+
+
 #endif /* !_ASMLANGUAGE */
 
 /* Exceptions 0-15 (MCAUSE interrupt=0) */
@@ -52,7 +55,7 @@ extern void arch_irq_enable(unsigned int irq);
 extern void arch_irq_disable(unsigned int irq);
 extern int arch_irq_is_enabled(unsigned int irq);
 
-#if defined(CONFIG_RISCV_HAS_PLIC) || defined(CONFIG_RISCV_HAS_CLIC)
+#if defined(CONFIG_RISCV_HAS_PLIC) || defined(CONFIG_RISCV_HAS_CLIC) || defined(CONFIG_WCH_PFIC)
 extern void z_riscv_irq_priority_set(unsigned int irq,
 				     unsigned int prio,
 				     uint32_t flags);

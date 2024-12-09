@@ -1,0 +1,38 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+config SOC_SERIES_CH58X
+    select RISCV
+	# select RISCV_PRIVILEGED
+	select ARCH_HAS_RAMFUNC_SUPPORT if XIP
+	select RISCV_ISA_RV32I
+	select RISCV_ISA_EXT_M
+	select RISCV_ISA_EXT_A
+	select RISCV_ISA_EXT_C
+	select RISCV_ISA_EXT_ZICSR
+	select ATOMIC_OPERATIONS_C
+    select INCLUDE_RESET_VECTOR
+	# select RISCV_PMP
+	select HAS_CH58X_HAL
+	select RISCV_ALWAYS_SWITCH_THROUGH_ECALL  #TODO: why need this
+
+if SOC_SERIES_CH58X
+
+if RISCV_PMP
+config PMP_SLOTS
+	default 4
+endif # PMP_SLOTS
+
+config RISCV_GP
+	default y
+
+config CLOCK_CONTROL
+	default y
+
+config GPIO
+	default y
+
+config PINCTRL
+	default y
+
+endif # SOC_SERIES_CH58X

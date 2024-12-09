@@ -1,0 +1,17 @@
+# Copyright (c) 2024 zerosensei
+
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH System Timer
+
+compatible: "wch,systimer"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true
+
+  interrupts:
+    required: true
+

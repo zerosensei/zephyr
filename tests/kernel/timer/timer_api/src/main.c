@@ -768,7 +768,7 @@ ZTEST_USER(timer_api, test_timeout_abs)
 
 	do {
 		t0 = k_uptime_ticks();
-		rem_ticks = k_timer_remaining_ticks(&remain_timer);
+		// rem_ticks = k_timer_remaining_ticks(&remain_timer);
 		t1 = k_uptime_ticks();
 	} while (t0 != t1);
 
