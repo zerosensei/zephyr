@@ -10,6 +10,5 @@ zephyr_library_sources(
 )
 
 zephyr_linker_sources(RAMFUNC_SECTION highcode.ld)
-zephyr_library_sources_ifdef(CONFIG_PM power.c)
 
 set(SOC_LINKER_SCRIPT ${ZEPHYR_BASE}/include/zephyr/arch/riscv/common/linker.ld CACHE INTERNAL "")
