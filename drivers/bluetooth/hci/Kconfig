@@ -183,6 +183,23 @@ config BT_AMBIQ_HCI
 	  Supports Ambiq Bluetooth SoC using SPI as the communication protocol.
 	  HCI packets are sent and received as single Byte transfers.
 
+config BT_WCH
+	bool "WCH HCI driver"
+	help
+	  WCH HCI bluetooth interface
+
+if BT_WCH
+	config BT_WCH_STACK_SIZE
+		int "WCH BT stack size for bt thread"
+		default 1024
+
+	config BT_WCH_MEM_POOL_SIZE
+		int "WCH BT memory pool size"
+		# default 6144
+		default 5000
+
+endif # BT_WCH
+
 config BT_HCI_INIT_PRIORITY
 	int "BT HCI init priority"
 	default 75 if BT_AMBIQ_HCI
