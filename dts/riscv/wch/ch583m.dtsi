@@ -1,0 +1,207 @@
+/*
+ * Copyright (c) 2024 zerosensei
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <mem.h>
+#include <freq.h>
+
+/ {
+    cpus {
+        #address-cells = <1>;
+		#size-cells = <0>;
+
+        cpu: cpu@0 {
+			device_type = "cpu";
+			compatible = "wch,qingke", "riscv";
+			reg = <0>;
+            riscv,isa = "rv32imac_zicsr_zifencei";
+			cpu-power-states = <&idle>, <&sleep>, <&shutdown>;
+		};
+
+        power-states {
+			idle: idle {
+				compatible = "zephyr,power-state";
+				power-state-name = "runtime-idle";
+				min-residency-us = <10>;
+				exit-latency-us = <10>;
+			};
+
+            sleep: sleep {
+				compatible = "zephyr,power-state";
+				power-state-name = "standby";
+				min-residency-us = <1400>;
+				exit-latency-us = <1400>;
+			};  
+
+            shutdown: shutdown {
+				compatible = "zephyr,power-state";
+				power-state-name = "soft-off";
+				min-residency-us = <0>;
+				exit-latency-us = <0>;
+                status = "disabled";
+			}; 
+		};
+    };
+
+    soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		interrupt-parent = <&pfic>;
+
+		pfic: interrupt-controller@e000e000 {
+			#interrupt-cells = <2>;
+			compatible = "wch,pfic";
+			interrupt-controller;
+			reg = <0xe000e000 0x1000>;
+			status = "okay";
+		};
+
+		sram0: memory@20000000 {
+			compatible = "mmio-sram";
+			reg = <0x20000000 DT_SIZE_K(32)>;
+		};
+
+        flash_controller: flash-controller@40001800 {
+            compatible = "wch,ch5xx-flash-controller";
+            reg = <0x40001800 0x800>;
+            data-flash-offset = <0x00070000>;
+
+            #address-cells = <1>;
+            #size-cells = <1>;
+			#erase-block-cells = <2>;
+
+            flash0: flash@0 {
+                compatible = "wch,ch5xx-flash", "soc-nv-flash";
+                reg = <0x00000000 DT_SIZE_K(480)>;
+                erase-block-size = <4096>;
+                write-block-size = <4>;
+                erase-blocks = <&flash_controller 112 4096>, <&flash_controller 128 256>;
+            };
+        };
+
+		systick: systick@e000f000 {
+			compatible = "wch,systimer";
+			reg = <0xe000f000 0x14>;
+			interrupts = <12 0>;
+		};
+
+		pinctrl: pin-controller@40001018 {
+			compatible = "wch,ch5xx-pinctrl";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x40001018 0x04>,
+				  <0x4000101a 0x04>;
+			reg-names = "PIN_ALTERNATE","PIN_ANALOG";
+			status = "okay";
+
+			gpioa: gpio@40001090 {
+				compatible = "wch,ch5xx-gpio";
+				reg = <0x40001090 0x02>,
+					  <0x40001094 0x02>,
+					  <0x4000109C 0x02>,
+					  <0x400010a0 0x14>;
+				reg-names = "INT_EN","INT_MODE","INT_IF","BASE";
+				interrupts = <17 3>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <16>;
+			};
+
+			gpiob: gpio@40001092 {
+				compatible = "wch,ch5xx-gpio";
+				reg = <0x40001092 0x02>,
+					  <0x40001096 0x02>,
+					  <0x4000109e 0x02>,
+					  <0x400010c0 0x14>;
+				reg-names = "INT_EN","INT_MODE","INT_IF","BASE";
+				interrupts = <18 4>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <24>;
+			};
+		};
+
+		systimer: systimer@e000f000 {
+			compatible = "wch,ch5xx_systimer";
+			reg = <0xe000f000 0x18>;
+            interrupts = <12 0>;
+			status = "okay";
+		};
+
+		rtc0: rtc@4000102c {
+			compatible = "wch,ch5xx-rtc";
+			reg = <0x4000102c 0x10>;
+			interrupts = <28 14>;
+            clocks = <&clk32k>;
+			status = "okay";
+		};
+
+		uart0: uart@40003000 {
+			compatible = "wch,ch5xx-uart";
+			reg = <0x40003000 0x400>;
+			interrupts = <26 12>;
+			status = "disabled";
+		};
+
+		uart1: uart@40003400 {
+			compatible = "wch,ch5xx-uart";
+			reg = <0x40003400 0x400>;
+			interrupts = <27 13>;
+			status = "disabled";
+		};
+
+    };
+	
+	clocks {
+        lse: lse {
+			compatible = "fixed-clock";
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+			status = "disabled";
+        }; 
+
+        lsi: lsi {
+			compatible = "wch,ch5xx-lsi";
+			clock-frequency = <32000>;
+			#clock-cells = <0>;
+			status = "okay";
+        }; 
+
+        clk32k: clk32k {
+            compatible = "wch,ch5xx-clk32k";
+            #clock-cells = <0>;
+            clock-source = <&lsi>;
+            status = "okay";
+        };
+
+        hse: hse {
+			compatible = "fixed-clock";
+			clock-frequency = <DT_FREQ_M(32)>;
+			#clock-cells = <0>;
+            status = "okay";
+        };
+
+        pll: pll {
+			compatible = "wch,ch5xx-pll";
+            clocks = <&hse>;
+			#clock-cells = <0>;
+			status = "disabled";
+        };
+
+        sysclk: sysclk {
+			compatible = "wch,ch5xx-sysclk";
+            clock-frequency = <DT_FREQ_K(6400)>;
+			#clock-cells = <0>;
+            status = "okay";
+		};
+	};
+
+    wch_bt_hci: wch_bt_hci {
+		compatible = "wch,wch-bt-hci";
+		status = "disabled";
+	};
+
+};
