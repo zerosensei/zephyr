@@ -1,0 +1,35 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+config SOC_CH581
+    bool
+    select SOC_SERIES_CH58X
+
+config SOC_CH582
+    bool
+    select SOC_SERIES_CH58X
+
+config SOC_CH583
+    bool
+    select SOC_SERIES_CH58X
+
+config SOC_CH581F
+    bool
+    select SOC_CH581
+
+config SOC_CH582M
+    bool 
+    select SOC_CH582
+
+config SOC_CH582F
+    bool 
+    select SOC_CH582
+
+config SOC_CH583M
+    bool
+    select SOC_CH583
+
+config SOC
+    default "ch581" if SOC_CH581F
+    default "ch582" if SOC_CH582M || SOC_CH582F
+    default "ch583" if SOC_CH583M

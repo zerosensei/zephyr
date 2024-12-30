@@ -1,0 +1,9 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_FAMILY_WCH
+
+rsource "*/Kconfig.defconfig"
+
+
+endif # SOC_FAMILY_WCH

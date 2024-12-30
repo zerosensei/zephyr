@@ -1,0 +1,18 @@
+family:
+- name: wch
+  series:
+  - name: ch57x
+    socs:
+    - name: ch571
+    - name: ch573
+  - name: ch58x
+    socs:
+    - name: ch581
+    - name: ch582
+    - name: ch583
+  - name: ch59x
+    socs:
+    - name: ch591
+    - name: ch592
+
+

@@ -1,0 +1,40 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+config SOC_SERIES
+	default "ch57x" if SOC_SERIES_CH57X
+	default "ch58x" if SOC_SERIES_CH58X
+	default "ch59x" if SOC_SERIES_CH59X
+	default "ch32" if SOC_SERIES_CH32
+
+config SOC_FAMILY_WCH
+	bool
+
+config SOC_FAMILY
+	default "wch" if SOC_FAMILY_WCH
+
+config SOC_SERIES_CH57X
+	bool
+	select SOC_FAMILY_WCH
+	help
+	  Enable support for CH57X MCU series
+
+config SOC_SERIES_CH58X
+	bool
+	select SOC_FAMILY_WCH
+	help
+	  Enable support for CH58X MCU series
+
+config SOC_SERIES_CH59X
+	bool
+	select SOC_FAMILY_WCH
+	help
+	  Enable support for CH59X MCU series
+
+config SOC_SERIES_CH32
+	bool
+	select SOC_FAMILY_WCH
+	help
+	  Enable support for CH32 MCU series
+
+rsource "*/Kconfig.soc"

@@ -1,0 +1,32 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_SERIES_CH58X
+
+rsource "Kconfig.defconfig.ch58*"
+
+DT_CLK32K_PATH := $(dt_nodelabel_path,clk32k)
+DT_CLOCK_SRC_PATH := $(dt_node_ph_prop_path,$(DT_CLK32K_PATH),clock-source)
+
+config SYS_CLOCK_TICKS_PER_SEC
+    default $(dt_node_int_prop_int,$(DT_CLOCK_SRC_PATH),clock-frequency) \
+        if WCH_RTC_TIMER
+    default 1000
+
+config SYS_CLOCK_HW_CYCLES_PER_SEC
+    default $(dt_node_int_prop_int,$(DT_CLOCK_SRC_PATH),clock-frequency) \
+         if WCH_RTC_TIMER
+	default $(dt_node_int_prop_int,/clocks/sysclk,clock-frequency)
+
+if RISCV_PMP
+config PMP_SLOTS
+	default 4
+endif # PMP_SLOTS
+
+config RISCV_GP
+	default y
+
+config CLOCK_CONTROL
+	default y
+
+endif # SOC_SERIES_CH58X
