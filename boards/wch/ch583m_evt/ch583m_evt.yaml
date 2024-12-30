@@ -1,0 +1,18 @@
+identifier: ch583m_evt
+name: CH583M EVT Board
+type: mcu
+arch: riscv
+toolchain:
+  - zephyr
+supported:
+  - adc
+  - gpio
+  - i2c
+  - watchdog
+  - uart
+  - dma
+  - pwm
+  - spi
+  - counter
+  - bluetooth
+vendor: wch

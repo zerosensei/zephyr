@@ -1,0 +1,34 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_CH583M_EVT
+
+config CONSOLE
+    default y
+
+config UART_CONSOLE
+    default CONSOLE
+
+if USB_DEVICE_STACK
+config SERIAL
+    default y
+endif # USB_DEVICE_STACK
+
+if BT
+config BT_CTLR
+    default n
+
+config BT_CTLR_CRYPTO
+    default n
+
+config BT_WCH
+    default y
+
+endif # BT
+
+# config HEAP_MEM_POOL_ADD_SIZE_BOARD
+# 	int
+# 	default 100 if BT
+# 	default 0
+
+endif # BOARD_CH583M_EVT

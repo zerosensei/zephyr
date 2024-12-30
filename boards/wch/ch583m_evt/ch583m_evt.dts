@@ -1,0 +1,116 @@
+/*
+ * Copyright (c) 2024 zerosensei
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <wch/ch583m.dtsi>
+#include "ch583m-pinctrl.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+    model = "WCH CH583M EVT board";
+    compatible = "wch,ch583m_evt";
+
+    chosen {
+        zephyr,console = &uart1;
+		zephyr,shell-uart = &uart1;
+        zephyr,sram = &sram0;
+        zephyr,flash = &flash0;
+        zephyr,bt-hci = &wch_bt_hci;
+    };
+
+    leds {
+        compatible = "gpio-leds";
+        led0: led_0 {
+            gpios = <&gpiob 18 GPIO_ACTIVE_LOW>;
+        	label = "Red LED 0";
+        };
+
+        led1: led_1 {
+            gpios = <&gpiob 19 GPIO_ACTIVE_LOW>;
+        	label = "Red LED 1";
+        };
+    };
+
+    keys {
+		compatible = "gpio-keys";
+        key1: key1 {
+            gpios = <&gpiob 4 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "KEY";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+    };
+
+    aliases {
+		led0 = &led0;
+		led1 = &led1;
+        sw0 = &key1;
+	};
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x10000>;
+		};
+        slot0_partition: partition@10000 {
+            label = "image-0";
+            reg = <0x10000 0x2e000>;
+        };
+        slot1_partition: partition@3e000 {
+            label = "image-1";
+            reg = <0x3e000 0x2e000>;
+        };
+        scratch_partition: partition@6c000 {
+            label = "image-scratch";
+            reg = <0x6c000 0x4000>;
+        };
+        storage_partition: partition@70000 {
+			label = "storage";
+			reg = <0x00070000 0x8000>;
+		};
+    };
+};
+
+&gpioa {
+	status = "okay";
+};
+
+&gpiob {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+};
+
+&lse {
+    status = "okay";
+};
+
+&clk32k {
+    clock-source = <&lse>;
+};
+
+&pll {
+    status = "okay";
+};
+
+&sysclk {
+    clocks = <&pll>;
+    clock-frequency = <DT_FREQ_M(60)>;
+};
+
+&wch_bt_hci {
+	status = "okay";
+};
