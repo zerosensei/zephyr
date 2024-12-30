@@ -1,0 +1,31 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+description: WCH CH5XX flash
+
+compatible: "wch,ch5xx-flash"
+
+include: base.yaml
+
+properties:
+  write-block-size:
+    type: int
+    description: |
+      The flash controller is limited by hardware to writing blocks of
+      this size, aligned to this size, in bytes, to previously erased
+      flash, within the flash memory area.
+
+  erase-block-size:
+    type: int
+    description: |
+      The flash controller is limited by hardware to erase whole
+      blocks of flash at a time. This property describes the largest
+      erase block size in erase-blocks.
+
+  erase-blocks:
+    type: phandle-array
+    required: true
+    description: |
+      The flash controller is limited by hardware to erase whole
+      blocks of flash at a time. This property describes the layout of
+      the erase-blocks, which can vary in size within the flash memory
+      area.

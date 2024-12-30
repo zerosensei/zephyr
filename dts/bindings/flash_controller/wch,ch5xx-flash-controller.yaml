@@ -1,0 +1,20 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+description: WCH CH5XX flash controller
+
+compatible: "wch,ch5xx-flash-controller"
+
+include: flash-controller.yaml
+
+properties:
+  "#erase-block-cells":
+    type: int
+    const: 2
+
+  data-flash-offset:
+    type: int
+    required: true
+    
+erase-block-cells:
+  - pages-count
+  - pages-size
