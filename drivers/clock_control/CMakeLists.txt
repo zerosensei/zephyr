@@ -98,3 +98,5 @@ endif()
 zephyr_library_sources_ifdef(CONFIG_CLOCK_CONTROL_AST10X0 clock_control_ast10x0.c)
 zephyr_library_sources_ifdef(CONFIG_CLOCK_CONTROL_MAX32 clock_control_max32.c)
 zephyr_library_sources_ifdef(CONFIG_CLOCK_CONTROL_NRF_AUXPLL clock_control_nrf_auxpll.c)
+
+zephyr_library_sources_ifdef(CONFIG_CLOCK_CONTROL_CH58X clock_control_ch58x.c)

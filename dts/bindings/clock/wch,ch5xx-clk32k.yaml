@@ -1,0 +1,18 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH CH5xx 32K clock controller
+
+compatible: "wch,ch5xx-clk32k"
+
+include: [clock-controller.yaml, base.yaml]
+
+properties:
+  "#clock-cells":
+    const: 0
+
+  clock-source:
+    required: true
+    type: phandle
+    description: |
+      Clock source for the 32K clock.

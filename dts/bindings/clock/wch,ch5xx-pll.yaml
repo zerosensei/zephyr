@@ -1,0 +1,12 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH CH5xx PLL clock controller
+
+compatible: "wch,ch5xx-pll"
+
+include: [clock-controller.yaml, base.yaml]
+
+properties:
+  clocks:
+    required: true

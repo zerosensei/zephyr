@@ -1,0 +1,9 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+config CLOCK_CONTROL_CH58X
+	bool "WCH CH58x Systime clock controller"
+	default y
+	depends on DT_HAS_WCH_CH5XX_SYSCLK_ENABLED
+	help
+	  Enable WCH CH58x clock controller.
