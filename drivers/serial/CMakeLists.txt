@@ -82,6 +82,7 @@ zephyr_library_sources_ifdef(CONFIG_UART_XMC4XXX uart_xmc4xxx.c)
 zephyr_library_sources_ifdef(CONFIG_USART_GD32 usart_gd32.c)
 zephyr_library_sources_ifdef(CONFIG_USART_SAM usart_sam.c)
 zephyr_library_sources_ifdef(CONFIG_USERSPACE uart_handlers.c)
+zephyr_library_sources_ifdef(CONFIG_UART_CH5XX uart_ch5xx.c)
 # zephyr-keep-sorted-stop
 
 if (CONFIG_UART_NRFX_UARTE)
