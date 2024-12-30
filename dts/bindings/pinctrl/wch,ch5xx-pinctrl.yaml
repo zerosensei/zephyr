@@ -1,0 +1,31 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+description: WCH pin controller
+
+compatible: "wch,ch5xx-pinctrl"
+
+include: base.yaml
+
+child-binding:
+  description: CH5xx pinmux group
+
+  child-binding:
+    include:
+      - name: pincfg-node.yaml
+        property-allowlist:
+          - bias-pull-up
+          - bias-pull-down
+          - drive-push-pull
+          - drive-open-drain
+          - input-enable
+          - output-enable
+
+    properties:
+      pinmux:
+        required: true
+        type: array
+
+      gpio-flags:
+        type: int
+        description: Additional flags for the pin.

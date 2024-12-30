@@ -1,0 +1,10 @@
+# Copyright (c) 2024 zerosensei
+# SPDX-License-Identifier: Apache-2.0
+
+
+config PINCTRL_CH5XX
+	bool "WCH CH5xx pinctrl driver"
+	default y
+	depends on DT_HAS_WCH_CH5XX_PINCTRL_ENABLED
+	help
+	  Enable the WCH CH5xx pinctrl driver
